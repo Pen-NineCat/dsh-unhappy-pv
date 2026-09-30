@@ -23,15 +23,20 @@ input/*
 *.m4a
 
 # ── 出片产物与中间件 ────────────────────────────────────────
+# 这些是构建产物，无论生成在仓库根还是 film/ 下都该忽略（见 AGENTS.md 规则 8）。
+# 确需提交同名目录/文件时，改名或显式 git add -f。
 out/
 *.mp4
 *.mkv
-film/**/frames_out/
-film/**/dsh_frames/
-film/**/segments/
+frames_out/
+dsh_frames/
+segments/
+stills*/
+*_frames.json
+frames.json
+# cache 这个名字太通用，只按参考项目的实际位置忽略，避免误吞一个叫 cache 的包
 film/**/cache/
-film/**/stills*/
-film/**/*_frames.json
+film/**/pv_cache/
 
 # ── 构建时下载 / 合成的，只该留在本机 ───────────────────────
 data/timing/*_filled.json

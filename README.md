@@ -82,8 +82,8 @@ python -m film.pages           # 逐帧 HTML → Playwright 截图
 python -m film.render          # 逐帧绘制 → 合成 → out/film.mp4
 ```
 
-本机现状（2026-09-30）：git 仓库已初始化（分支 `master`，**还没有提交**）；`.venv` 由 uv 建，实测 **Python 3.14.7**；
-**ffmpeg/ffprobe 不在 PATH**，Playwright 未安装，`pillow`/`numpy` 还没加进依赖。动手前先补齐这几样。
+本机现状（2026-09-30）：git 仓库已初始化并推送（`origin` = `github.com/Pen-NineCat/dsh-unhappy-pv`，默认分支 `master`）；
+`.venv` 由 uv 建，实测 **Python 3.14.7**；**ffmpeg/ffprobe 不在 PATH**，Playwright 未安装，`pillow`/`numpy` 还没加进依赖。动手前先补齐这几样。
 
 ## 技术要点
 
