@@ -42,10 +42,18 @@ film/**/pv_cache/
 data/timing/*_filled.json
 *.lrc
 
+# ── Playwright 产物 ────────────────────────────────────────
+test-results/
+playwright-report/
+blob-report/
+
 # ── 工具链 ─────────────────────────────────────────────────
 node_modules/
 __pycache__/
 *.py[cod]
+# uv / setuptools 的本地安装与构建产物
+*.egg-info/
+.pytest_cache/
 .env
 .env.*
 !.env.example

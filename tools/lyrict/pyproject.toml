@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lyrict"
+# Upstream (https://github.com/AverageHoarder/lyrict) publishes no releases and
+# therefore no version, so this is a local vendor placeholder, not an upstream
+# version. Bump it here if this copy ever diverges further from upstream.
+version = "0.0.0+vendored"
+description = "Recursively check, standardize, import and export embedded and external synced and unsynced lyrics of audio files (vendored copy of AverageHoarder/lyrict)."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE.txt"]
+requires-python = ">=3.12"
+authors = [{ name = "Malte (AverageHoarder)" }]
+keywords = ["lyrics", "lrc", "sylt", "uslt", "id3", "vorbis", "flac", "mp3", "mutagen", "mp3tag"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Multimedia :: Sound/Audio",
+    "Topic :: Text Processing",
+]
+
+dependencies = [
+    "mutagen>=1.47,<2",
+    "tqdm>=4.66,<5",
+]
+
+# No [project.optional-dependencies] on purpose: the mp3tag mode shells out to
+# Mp3tag, a proprietary Windows/macOS GUI that is not on PyPI, so there is no
+# installable extra for it - run `lyrict -m mp3tag` only on a machine where the
+# `mp3tag` CLI is on PATH. Everything the script itself needs is a hard
+# dependency above; `--progress` needs nothing extra because tqdm is one too.
+
+[project.urls]
+Upstream = "https://github.com/AverageHoarder/lyrict"
+Vendored-in = "https://github.com/Pen-NineCat/dsh-unhappy-pv"
+
+[project.scripts]
+# Same CLI as upstream's `python lyrict.py ...`, just installed as a command.
+lyrict = "lyrict:cli"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+packages = ["lyrict"]
+
+[tool.uv]
+# Member of the repository workspace declared in the root pyproject.toml
+# (../../pyproject.toml). `uv sync` / `uv run` from the repository root installs
+# this package, its dependencies above and the `lyrict` command into the
+# repository's single .venv - there is no separate environment for this tool.
