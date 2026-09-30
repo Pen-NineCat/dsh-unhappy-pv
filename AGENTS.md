@@ -18,7 +18,7 @@
 
 **已经确定的**：非官方同人、逐帧用代码生成、目标曲目是上面那一首、素材策略见 §3。
 
-**现状**：仓库只有骨架 + 指纹 + 一个修剪工具。渲染代码一行都没写，所以 §5 里除 `trim_song.py` 之外的命令都是**计划中的接口**。
+**现状**：仓库只有骨架 + 指纹 + 两个工具（`trim_song.py`、已打包的 `tools/lyrict/`）。渲染代码一行都没写，所以 §5 里除这几个工具之外的命令都是**计划中的接口**。
 接口一旦落地，请立刻回来改这份文件——它宁可短，也不要写不存在的命令。
 
 ## 2. 硬规则（不要违反）
@@ -40,7 +40,7 @@
 ## 3. 素材事实（改代码前先读这一节）
 
 目标曲目：**69岁牢二次元 - unhappy（69岁牢二次元 remix）**（专辑 `[三分钟]Unhappy`）。
-以下全部由本机原件实测（2026-09-30，解析 MPEG 帧头 + ID3v2 标签，**本机没有 ffprobe**）：
+以下全部由本机原件实测（2026-09-30 解析 MPEG 帧头 + ID3v2 标签；ffprobe 的复核见本节末尾，它给出了**不一样**的数字）：
 
 | | 原曲（发行版） | 母版（成片所对齐） |
 |---|---|---|
@@ -51,23 +51,29 @@
 | 整数视频帧 @24 fps | 4741.632 → 取 4741 | 4741（多出 2.33 ms） |
 
 - 其余参数：MP3 CBR 320 kbps、48 kHz、立体声、1152 采样/帧、960 字节/帧；ID3v2.3（内嵌约 2 MB 封面）、结尾 128 字节 ID3v1。
-- **两步校验**（`python tools/trim_song.py check`）：
+- **两步校验**（`uv run python tools/trim_song.py check`）：
   1. **原曲** sha256 对不上 → **只警告**（可能仍能出片，但唱词与切点会漂移）；
   2. **母版** sha256 对不上 → **停下重做母版**，时间轴不可信。
 - **母版怎么来的**：`tools/trim_song.py` 按 MPEG 帧边界做**字节级截断**（不重编码），所以 sha256 与机器、ffmpeg 版本无关；
   母版就是原曲的**字节前缀**，这条性质可以手工复核（截到第 9,971,148 字节）。
 - **时间零点 = 母版的第一个解码采样**（与参考项目同一约定）。片头静音长短不一致会让整片平移。
 - **已知怪癖**：原件 Xing/Info 头 `frames=8231` 而 `bytes=7902720`（= 8232 帧），头部自身差一帧；母版默认不改头部，
-  于是按字节估算长度的解码器会把母版报成 197.568 s（多 24 ms，不影响 `-shortest` 下的成片）。
-  要头部自洽用 `--patch-info`，但那会得到另一个 sha256（`f119cfba…`）——**两者只能选一个并固定在 `Resource/song.json`**。
-- 🚧 **未核实**：时长未用 ffprobe 复核；解码器延迟/补齐（约 1105 采样）未核实，本工具只保证 MPEG 帧层对齐。
+  于是**任何读头部的工具都会把这两份文件报成同一个长度**。要头部自洽用 `--patch-info`，
+  但那会得到另一个 sha256（`f119cfba…`）——**两者只能选一个并固定在 `Resource/song.json`**。
+- **ffprobe 复核（2026-10-01，用 `E:\ffmpeg\bin\ffprobe.exe`，因为本进程 PATH 里没有它）**：原曲与母版报的时长**都是 `197.504` s**
+  ——它读 Xing/Info 头，而母版没改头部，所以**它分不出这两份文件**，不能拿它的时长当帧数依据。
+- **由此实测到的陷阱**：`-shortest` 会按 197.504 s 切断视频，**4741 帧的成片变成 4739 帧**（少 2 帧，实测）；
+  出片必须用 `-t round(END_T*FPS)/FPS` 或 `-frames:v <总帧数>` 显式定长，别让音频决定片长。
+- 🚧 **仍未核实**：解码器延迟/补齐（约 1105 采样）没有核实，本工具只保证 MPEG 帧层对齐。
 
 ## 4. 目录约定（部分为计划）
 
 | 路径 | 内容 | 提交 |
 |---|---|---|
 | `Resource/` | `song.json`（两步 sha256 + 参数 + 已知怪癖）、`README.md`（为什么没有原件） | ✅ |
-| `tools/` | `trim_song.py`（已落地）；以后放 `check_song.py`、`lyrics.py` 之类 | ✅ |
+| `tools/` | `trim_song.py`（已落地）、`lyrict/`（**已打包**的歌词工具，见下） | ✅ |
+| `tools/lyrict/` | 上游 `AverageHoarder/lyrict`（MIT）的 vendored 副本：`src/lyrict/` + `pyproject.toml` + `tests/`（纯标准库测试） | ✅ |
+| `package.json`、`package-lock.json` | Node 侧 `devDependencies`：`playwright` **精确锁 `1.63.0`**（不写 `^`，截图器要确定性）；`private: true`，没有 `main`/`scripts`——还没有 Node 侧入口 | ✅ |
 | `input/` | 本机输入：`song.mp3`、`song.master.mp3`、可选 `lyrics.lrc`；除 `README.md` 外全部忽略 | ❌ |
 | `data/` | 不含文字的逐词时间轴等小体积清单（计划） | ✅ |
 | `film/` | 出片代码：左侧页面脚本 + 截图器、右侧 PIL 引擎、合成器（计划） | ✅ |
@@ -78,22 +84,34 @@
 
 ## 5. 命令
 
-**已落地**（可以直接跑）：
+**已落地**（可以直接跑；本仓库的 Python 命令一律走 `uv run`，因为 `python` 指向系统解释器，里面没有这些依赖）：
 
 ```bash
 # 生成母版（本机跑一次）+ 两步校验（每次出片前跑）
-python tools/trim_song.py make  --src input/song.mp3 --out input/song.master.mp3 --fps 24
-python tools/trim_song.py check --src input/song.mp3 --master input/song.master.mp3
+uv run python tools/trim_song.py make  --src input/song.mp3 --out input/song.master.mp3 --fps 24
+uv run python tools/trim_song.py check --src input/song.mp3 --master input/song.master.mp3
+# 它只依赖标准库，所以系统 python 也能跑；但按本节开头那条，文档里的 Python 命令一律写 uv run
+
+# 歌词工具（tools/lyrict，vendored 上游 AverageHoarder/lyrict）
+uv run lyrict -h                                  # 用法；uv run lyrict 与 uv run python -m lyrict 等价
+uv run lyrict -m export -d input -o               # 从下载到的 mp3 导出歌词标签 → input/*.lrc（用法见 README「快速开始」）
+uv run lyrict -m test -d input                    # 检查 .lrc/.txt 有没有对应音频
+uv run lyrict -m import -d input --standardize keep   # 把外部歌词写进音频标签
+uv run python tools/lyrict/tests/test_lyrict.py   # 自带测试（纯标准库，13 项）
 ```
 
 `check` 的退出码：0 通过（原曲不匹配只是警告）；1 母版不匹配或不再是原曲的前缀；2 用法错误。
 
+**工具依赖由 workspace 统一管理**：`tools/lyrict/` 是根 `pyproject.toml` 里 `[tool.uv.workspace]` 的成员，
+所以**只需要在仓库根跑一次 `uv sync`**，主项目和这个工具（含 mutagen、tqdm）就都装进同一个 `.venv`。
+不要在 `tools/lyrict/` 里另建环境、也不要给它单独的 `uv.lock`——那正是要避免的「拉两次依赖」。
+
 **计划中**（模块名待定，落地后请删掉本段说明）：
 
 ```bash
-python tools/check_song.py     # 环境与素材自检：两步 sha256、字体、ffmpeg
-python -m film.pages           # 逐帧 HTML → Playwright 截图
-python -m film.render          # 逐帧绘制 → 合成 → out/film.mp4
+uv run python tools/check_song.py   # 环境与素材自检：两步 sha256、字体、ffmpeg
+uv run python -m film.pages         # 逐帧 HTML → Playwright 截图
+uv run python -m film.render        # 逐帧绘制 → 合成 → out/film.mp4
 ```
 
 只重渲某几帧（参考项目最实用的一个开关，务必保留）：
@@ -102,16 +120,18 @@ python -m film.render          # 逐帧绘制 → 合成 → out/film.mp4
 node shot.mjs frames.json 2769 2770 2800
 ```
 
-## 6. 本机环境现状（2026-09-30 快照）
+## 6. 本机环境现状（2026-10-01 复核）
 
 | 项 | 状态 |
 |---|---|
-| git | 分支 `master`；remote `origin` → `https://github.com/Pen-NineCat/dsh-unhappy-pv`（2026-09-30 建的空仓库，首次推送时 `master` 成为默认分支） |
+| git | 分支 `master`；remote `origin` → `https://github.com/Pen-NineCat/dsh-unhappy-pv`。**复核当时有未提交改动**：`AGENTS.md`、`README.md`、`.gitignore`、`pyproject.toml`、`uv.lock` 已改；`tools/lyrict/`、`package.json`、`package-lock.json` 未跟踪。动手前先自己 `git status` 看一眼，别信这张表 |
 | 环境管理 | **uv**（0.12.13）+ `uv.lock`；`.venv` 实测 **Python 3.14.7**（`requires-python = ">=3.12"`，uv 取了系统 3.14，不是 3.12） |
-| 依赖 | `dependencies = []` —— **pillow / numpy 还没装**；系统另有 `C:\Python314\python.exe` |
-| Node | 有（`E:\NodeJS`） |
-| ffmpeg / ffprobe | **不在 PATH** —— 出片必需，动手前先装（也才能复核时长与 `known_quirks`） |
-| Playwright | 未安装（需要 `npm install` + `npx playwright install chromium`） |
+| uv 管的依赖 | `dependencies = ["lyrict", "mutagen", "numpy", "pillow", "tqdm"]` —— `lyrict` 是 `tools/lyrict/` 这个 workspace 成员的本地引用（它自带 mutagen/tqdm 声明，根里重复一遍以免两处漂移）；`numpy` / `pillow` 是渲染侧要用的，虽然 `film/` 还没落地也**先声明进 lock**。仓库根跑一次 `uv sync` 就够 |
+| 依赖纪律 | **包只走 `uv add`**：手工装进 `.venv` 但没进 `uv.lock` 的包会被下一次 `uv sync` 清掉（`numpy`/`pillow` 在 2026-10-01 之前就是这个状态，已改正） |
+| Python | 系统另有 `C:\Python314\python.exe`（没装本仓库依赖，只适合跑纯标准库脚本） |
+| Node | `E:\NodeJS`；`node v24.19.0`、`npm 11.17.0`、`npx playwright --version` = **1.63.0**。**PowerShell 的执行策略禁用了 `npm.ps1` / `npx.ps1`**，得用 `npm.cmd` / `npx.cmd`（或 `cmd /c npm ...`） |
+| ffmpeg / ffprobe | 装在 **`E:\ffmpeg\bin`**（ffmpeg / ffprobe / ffplay，`ffprobe N-127021-ge0c94b2d1c-20260930`），并且已在**用户级 PATH**；**但已经在运行的 dsh 进程不继承用户级 PATH** —— agent 的 shell 里直接敲 `ffmpeg` 是 CommandNotFound，要么写绝对路径 `E:\ffmpeg\bin\ffprobe.exe`，要么重启 dsh 让它继承 |
+| Playwright 浏览器 | 已就绪（`%LOCALAPPDATA%\ms-playwright`）：`chromium-1243`、`chromium_headless_shell-1243`、`ffmpeg-1011`、`winldd-1007` |
 | 参考项目工作副本 | `PersonalWorkaround/world-execute-me-dsh-pv/`（自带 `.git`，1586 个已跟踪文件，勿动） |
 
 新建/改动环境的命令一律用 `uv`（`uv sync`、`uv add <pkg>`），不要往 `.venv` 里手动 `pip install`。
@@ -137,10 +157,12 @@ node shot.mjs frames.json 2769 2770 2800
 喂管道前断言 `im.mode == "RGB" and im.size == (W, H)`；`im.tobytes()` 的顺序必须与 `-pix_fmt rgb24` 一致。
 并行按**连续帧段**切分（每个 worker 从自己的 `n0` 起跑并把 `prev` 重置为 `None`），段内 `concat` 不重编码，最后混音 + `+faststart`。
 混音时用母版（`input/song.master.mp3`），不要用原曲——尾部那 0.632 帧会让末尾差一帧。
+片长**由帧数决定，不由音频决定**：不要用 `-shortest`（它按 ffprobe 报的 197.504 s 切，4741 帧会变成 4739 帧，实测），
+用 `-t round(END_T*FPS)/FPS` 或 `-frames:v <总帧数>`；出片后用 §8 的成片帧数护栏对数。
 
 **脚本侧（本仓库的工具）**
 
-- 只依赖标准库、不依赖 ffmpeg 的最优先（`trim_song.py` 就是纯标准库），因为本机连 ffmpeg 都还没有。
+- 只依赖标准库、不依赖 ffmpeg 的最优先（`trim_song.py` 就是纯标准库）；ffmpeg 的位置与 PATH 现状见 §6。
 - 任何「生成物 + sha256」的组合都要能在**另一台机器**上复现；不能复现的方案要在文档里明说。
 
 ## 8. 验证护栏（改完必须跑）
@@ -152,16 +174,19 @@ node shot.mjs frames.json 2769 2770 2800
 | ⭐ 帧数对账 | 各段区间求和 == 期望总帧数 `round(END_T * FPS)`（🚧 fps 定下后重算；按 24 fps 是 4741），文件名编号连续无空洞 |
 | ⭐ 同帧双渲比对 | 同一 `n` 渲两次，`ImageChops.difference(a, b).getbbox()` 必须是 `None` |
 | ⭐ 时间线断言 | 语段表按时间排序、首尾相接、无空洞无重叠，覆盖 `[0, END]` |
-| 素材两步校验 | `python tools/trim_song.py check` 退出码 0 |
+| 素材两步校验 | `uv run python tools/trim_song.py check` 退出码 0 |
+| 成片帧数 | `ffprobe -count_frames` 数出来的视频帧数 == 期望总帧数（`-shortest` 会偷偷少 2 帧，见 §3） |
 | 无空白帧 | 抽样 `ImageStat.stddev`，纯色帧（≈0）通常是注入失败 |
 | 边界帧抽查 | 显式渲 `t=0`、末帧、每个转场的首末帧，人眼看一遍 |
 | 仓库卫生 | `git status` 干净；构建跑完出现未跟踪文件 = `.gitignore` 漏了 |
 
-**尚未做的事如实说**：不写「已验证音画同步」这种话。目前没有任何逐帧视觉验收；时长也还没用 ffprobe 复核。
+**尚未做的事如实说**：不写「已验证音画同步」这种话。目前没有任何逐帧视觉验收；时长虽已用 ffprobe 复核（§3），但它的读数与物理帧数不一致，只能当参考。
 
 ## 9. 许可与署名
 
 - **代码**：MIT —— 见 [LICENSE.txt](LICENSE.txt)（Copyright (c) 2026-Present Pen-NineCat）。
+- **vendored 的 `tools/lyrict/`**：同样是 MIT，但版权归上游 Malte（`AverageHoarder/lyrict`）——见 [tools/lyrict/LICENSE.txt](tools/lyrict/LICENSE.txt)。
+  这是本仓库里唯一一份**别人写的**代码，改动请只做必要的 bug 修复并在 `tools/lyrict/README.md` 的「Packaging and local changes」里记账。
 - **音乐与歌词**：**不随仓库分发，不授予再许可**；`Resource/song.json` 只是指纹，母版只在本地。
 - 本片是非官方同人作品，与 DeepSeek、曲作者无隶属或认可关系；发布成片时按平台要求标注 AI 生成内容（若用到）。
 - 参考项目的第三方资产（字体 OFL、dsh 前端 MIT、鲸鱼娘立绘 CC BY-NC-SA 4.0）**不要顺手复制过来**。
