@@ -1,0 +1,51 @@
+# ─────────────────────────────────────────────────────────────
+# dsh-unhappy-pv · 忽略规则
+# 上半段是仓库里已有的三条；下半段是补的（路径有一部分是计划中的，落地后按实际目录调整）
+# ─────────────────────────────────────────────────────────────
+
+# Pycharm temporary files
+.idea
+
+# UV virtual environment
+.venv
+
+# PenNineCat personal workaround
+PersonalWorkaround
+
+# ── 本机输入：受版权保护，永不提交 ──────────────────────────
+input/*
+!input/README.md
+
+# 保险丝：任何位置都不要提交音频原件（确需提交时显式 git add -f 并说明理由）
+*.mp3
+*.wav
+*.flac
+*.m4a
+
+# ── 出片产物与中间件 ────────────────────────────────────────
+out/
+*.mp4
+*.mkv
+film/**/frames_out/
+film/**/dsh_frames/
+film/**/segments/
+film/**/cache/
+film/**/stills*/
+film/**/*_frames.json
+
+# ── 构建时下载 / 合成的，只该留在本机 ───────────────────────
+data/timing/*_filled.json
+*.lrc
+
+# ── 工具链 ─────────────────────────────────────────────────
+node_modules/
+__pycache__/
+*.py[cod]
+.env
+.env.*
+!.env.example
+
+# ── 编辑器 / 系统 ──────────────────────────────────────────
+*.log
+.DS_Store
+Thumbs.db

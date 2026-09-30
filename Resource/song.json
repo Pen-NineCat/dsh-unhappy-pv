@@ -1,0 +1,45 @@
+{
+  "title": "unhappy（69岁牢二次元 remix）",
+  "artist": "69岁牢二次元",
+  "album": "[三分钟]Unhappy",
+  "codec": "mp3",
+  "sample_rate": 48000,
+  "channels": 2,
+  "bit_rate": 320000,
+  "samples_per_frame": 1152,
+  "frame_bytes": 960,
+  "source": {
+    "sha256": "2dcc4522772161d4fc747903217f3d2730b5d1335fb8b1b8c3615e915c343a2c",
+    "duration_s": 197.568,
+    "mp3_frames": 8232,
+    "bytes": 9972236,
+    "note": "发行版原件。只在本地，本仓库不存音频；这一步只用来确认你手上是哪一份。"
+  },
+  "master": {
+    "sha256": "d60539b00745d926822d7e559d846c6610b827061b3695336bd1452014a3dbe8",
+    "duration_s": 197.544,
+    "mp3_frames": 8231,
+    "bytes": 9971148,
+    "video_frames": 4741,
+    "fps": 24,
+    "overshoot_s": 0.002333,
+    "made_by": "python tools/trim_song.py make --src <原曲> --out <母版> --fps 24",
+    "method": "字节级截断：保留 ID3v2 标签与第 1 个 MPEG 帧起的前 8231 帧，丢弃尾部 1088 字节。不重编码，所以 sha256 与机器、ffmpeg 版本无关。",
+    "invariant": "母版 == 原曲的前 9971148 字节（可手工复核：sha256(原曲[:9971148])）",
+    "note": "成片按这份文件对齐，时间零点 = 它的第一个解码采样。母版同样只在本地。"
+  },
+  "check": {
+    "step1": "原曲 sha256 == source.sha256：确认你手上是哪一份原件。不匹配只警告（可能仍能出片，但唱词与切点会漂移）。",
+    "step2": "母版 sha256 == master.sha256：时间轴可信。不匹配必须停下来重新生成母版，不要出片。",
+    "command": "python tools/trim_song.py check --src input/song.mp3 --master <母版>"
+  },
+  "known_quirks": {
+    "xing_info_header": "原件首帧带 Xing/Info 头：frames=8231，但 bytes=7902720 恰好是 8232 帧的字节数 —— 原件头部两个字段自身差一帧。",
+    "master_header": "母版默认不改头部，它的 bytes 字段仍写着 7902720（多于母版实际的 7901760），因此按字节估算长度的解码器会把母版报成 197.568 s（多 24 ms）。要让头部自洽就加 --patch-info，但那会得到另一个 sha256（f119cfba9e606cef7e76a1429b5f5c54f77ece86526c9e337e21aa7b11c8e995），两者只能选一个固定下来。",
+    "fps_dependency": "🚧 帧率未定：master 的数值依赖 24 fps。fps 一改，整数视频帧数与母版 sha256 都会变，必须重跑 tools/trim_song.py 并更新这里。"
+  },
+  "unverified": [
+    "本机没有 ffprobe，时长由 MPEG 帧头解析得出（8232 帧 × 1152 ÷ 48000），未与 ffprobe 复核。",
+    "解码器延迟/补齐（约 1105 采样）尚未核实；本工具只保证 MPEG 帧层的对齐。"
+  ]
+}
