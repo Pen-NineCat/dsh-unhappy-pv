@@ -124,7 +124,7 @@ node shot.mjs frames.json 2769 2770 2800
 
 | 项 | 状态 |
 |---|---|
-| git | 分支 `master`；remote `origin` → `https://github.com/Pen-NineCat/dsh-unhappy-pv`。**复核当时有未提交改动**：`AGENTS.md`、`README.md`、`.gitignore`、`pyproject.toml`、`uv.lock` 已改；`tools/lyrict/`、`package.json`、`package-lock.json` 未跟踪。动手前先自己 `git status` 看一眼，别信这张表 |
+| git | 分支 `master`；remote `origin` → `https://github.com/Pen-NineCat/dsh-unhappy-pv`。**表格里的状态类信息一定会过期**：动手前自己跑 `git status`（规则 4 要求提交前干净），别照抄这里的快照 |
 | 环境管理 | **uv**（0.12.13）+ `uv.lock`；`.venv` 实测 **Python 3.14.7**（`requires-python = ">=3.12"`，uv 取了系统 3.14，不是 3.12） |
 | uv 管的依赖 | `dependencies = ["lyrict", "mutagen", "numpy", "pillow", "tqdm"]` —— `lyrict` 是 `tools/lyrict/` 这个 workspace 成员的本地引用（它自带 mutagen/tqdm 声明，根里重复一遍以免两处漂移）；`numpy` / `pillow` 是渲染侧要用的，虽然 `film/` 还没落地也**先声明进 lock**。仓库根跑一次 `uv sync` 就够 |
 | 依赖纪律 | **包只走 `uv add`**：手工装进 `.venv` 但没进 `uv.lock` 的包会被下一次 `uv sync` 清掉（`numpy`/`pillow` 在 2026-10-01 之前就是这个状态，已改正） |
