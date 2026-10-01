@@ -1,0 +1,7 @@
+/* 由 film/pages/extract-css.mjs 补的**兜底令牌**（不是从 dsh 抽出来的）。
+   这些令牌被 vendored CSS 引用，但在任何 dsh 包里都没有定义 ——
+   见该文件里 FALLBACK_TOKENS 的注释。 */
+:root, body, body[data-ds-dark-theme] {
+  --dsw-alias-bg-layer-4: var(--dsw-static-neutral-bluish-1000);
+  --dsw-alias-label-error: var(--dsw-static-red-600);
+}

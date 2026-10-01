@@ -19,13 +19,12 @@
    第 2 步对不上就**必须停下来重做母版**——那意味着时间轴不可信。
 
 ```bash
-# 过渡期：本仓库已移除 Python 环境，只剩这一个纯标准库脚本，用系统解释器跑
-python tools/trim_song.py make  --src input/song.mp3 --out input/song.master.mp3 --fps 24
-python tools/trim_song.py check --src input/song.mp3 --master input/song.master.mp3
-
-# 目标形态：Phase 1 的 Node 移植，必须与 Python 版逐字节对拍通过后才接替它
+# 现行：Node 版（与过渡期的 Python 版逐字节对拍过）
 node tools/trim-song.mjs make  --src input/song.mp3 --out input/song.master.mp3 --fps 24
 node tools/trim-song.mjs check --src input/song.mp3 --master input/song.master.mp3
+
+# 过渡期：Python 版仍可跑（纯标准库，用系统解释器）；等作者拍板后删除
+python tools/trim_song.py check --src input/song.mp3 --master input/song.master.mp3
 ```
 
 母版有一个很好复核的性质：**它就是原曲的字节前缀**。

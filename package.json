@@ -1,7 +1,7 @@
 {
   "name": "dsh-unhappy-pv",
   "version": "0.1.0",
-  "description": "Node-side tooling for dsh-unhappy-pv: Playwright, used by the per-frame screenshotter (film/, planned).",
+  "description": "Node-side tooling for dsh-unhappy-pv: the pure-Node per-frame PV pipeline (film/).",
   "homepage": "https://github.com/Pen-NineCat/dsh-unhappy-pv#readme",
   "bugs": {
     "url": "https://github.com/Pen-NineCat/dsh-unhappy-pv/issues"
@@ -13,8 +13,28 @@
   "license": "MIT",
   "author": "Pen-NineCat",
   "private": true,
-  "type": "commonjs",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "check": "node film/check.js",
+    "test": "node film/test/run.js",
+    "guard": "node film/guard.js",
+    "guard:full": "node film/guard.js --full",
+    "trim": "node tools/trim-song.mjs",
+    "pages": "node film/pages/gen-frames.js && node film/pages/shot.mjs",
+    "prelude": "node film/pages/gen-frames.js --range 0 419 && node film/pages/shot.mjs --range 0 419 --out out/prelude && node film/pages/preview.mjs --range 0 419 --shots out/prelude",
+    "preview": "node film/pages/preview.mjs",
+    "smoke": "node film/pages/shot.mjs --smoke --seconds 4",
+    "render": "node film/render-video.js",
+    "master": "node film/render-video.js --codec lossless --out out/film.master.mkv --deliver",
+    "all": "npm run check && npm run test && npm run pages && npm run render"
+  },
   "devDependencies": {
     "playwright": "1.63.0"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "1.0.9"
   }
 }

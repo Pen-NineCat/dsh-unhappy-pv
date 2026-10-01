@@ -1,0 +1,87 @@
+{
+  "generatedBy": "film/pages/extract-css.mjs",
+  "dshPackagesRoot": "E:\\NodeJSGlobalPackage\\node_modules\\@deepseek-ai\\dsh\\node_modules\\@deepseek-ai",
+  "packages": [
+    {
+      "name": "dsh-client-ui-theme",
+      "version": "0.1.7-rc.2",
+      "blocks": 10,
+      "cssBytes": 35564,
+      "tokens": 395
+    },
+    {
+      "name": "dsh-client-ui-chat",
+      "version": "0.1.7-rc.2",
+      "blocks": 18,
+      "cssBytes": 30628,
+      "tokens": 1
+    },
+    {
+      "name": "dsh-client-ui-tool",
+      "version": "0.1.7-rc.2",
+      "blocks": 5,
+      "cssBytes": 14449,
+      "tokens": 0
+    },
+    {
+      "name": "dsh-client-ui-conversation",
+      "version": "0.1.7-rc.2",
+      "blocks": 9,
+      "cssBytes": 25793,
+      "tokens": 1
+    },
+    {
+      "name": "dsh-client-ui-message-feedback",
+      "version": "0.1.7-rc.2",
+      "blocks": 2,
+      "cssBytes": 2577,
+      "tokens": 0
+    },
+    {
+      "name": "dsh-client-ui-deliverables",
+      "version": "0.1.7-rc.2",
+      "blocks": 5,
+      "cssBytes": 13226,
+      "tokens": 0
+    },
+    {
+      "name": "dsh-client-ui-layout",
+      "version": "0.1.7-rc.2",
+      "blocks": 1,
+      "cssBytes": 3603,
+      "tokens": 0
+    },
+    {
+      "name": "dsh-client-ui-cordis",
+      "version": "0.1.7-rc.2",
+      "blocks": 3,
+      "cssBytes": 11982,
+      "tokens": 1
+    },
+    {
+      "name": "dsh-client-ui-sidebar",
+      "version": "0.1.7-rc.2",
+      "blocks": 2,
+      "cssBytes": 9742,
+      "tokens": 0
+    },
+    {
+      "name": "dsh-client-ui-model-selection",
+      "version": "0.1.7-rc.2",
+      "blocks": 1,
+      "cssBytes": 4087,
+      "tokens": 1
+    },
+    {
+      "name": "dsh-client-ui-settings-subagent",
+      "version": "0.1.7-rc.2",
+      "blocks": 3,
+      "cssBytes": 2685,
+      "tokens": 0
+    }
+  ],
+  "missing": [],
+  "totalCssBytes": 154336,
+  "tokenCount": 395,
+  "tokensDefinedOutsideTheme": {}
+}

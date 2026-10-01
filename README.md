@@ -1,22 +1,17 @@
 # dsh-unhappy-pv
 
 一支**逐帧用代码生成**的非官方同人 PV —— 目标曲目《69岁牢二次元 - unhappy（69岁牢二次元 remix）》。
-
-🚧 **整体画面概念还没拍板，下面三条只是参考方向，不要当成结论。**
-参考项目 `world-execute-me-dsh-pv` 的做法是左右分屏：
-
-- 🚧 **左半**：DeepSeek Harness（dsh）的聊天窗口，她和「你」的对话。每帧生成 HTML、复用 dsh 自己的 CSS，用 Playwright 确定性截图。
-- 🚧 **右半**：运行着她的那个「世界」，也就是模型的可视化。用 Node 侧的 canvas（`@napi-rs/canvas`，Skia）逐帧绘制 —— **「她」长什么样也还没定**。
-- 🚧 **合成**：网页截图当成图形侧的一个图层，镜头运动、后期、编码全部由图形侧统一掌管。
-
 画面全部是歌曲时间 `t` 的纯函数：不用剪辑软件，没有手工关键帧。
 
-> **状态：骨架 + 指纹 + 一份 vendor 前端。出片代码还没开始写。**
-> 仓库里目前只有 `LICENSE.txt`、`Resource/`（歌曲指纹）、`package.json`（只有 playwright）、`film/vendor/dsh-web-frontend/`（截图要用的 dsh 前端，MIT），
-> 以及一个待退役的 Python 工具 `tools/trim_song.py`。**画面规格已定：24 fps、1920×1080 原生（全片 4741 帧）。**
-> **下面带「计划中」字样的命令都还不存在。**
-> 管线选型与分阶段计划写在本地施工说明 `PersonalWorkaround/dsh-wme-pv-node-migration.md`（不提交）。
-> 灵感与技术路线来自参考项目 [`world-execute-me-dsh-pv`](https://github.com/Misakazentai/world-execute-me-dsh-pv)（本地副本在 `PersonalWorkaround/`，不提交）。
+> **状态：出片管线已完成并验收；片子还没开始画。**
+>
+> - **管线**：纯 Node —— `@napi-rs/canvas`（Skia）+ Playwright + ffmpeg + `worker_threads`，Phase 0–7 全部落地。
+>   本轮实测：`node film/check.js` 退出 0、`node film/test/run.js` **209/209**、`node film/guard.js` **14/14**（三条 ⭐ 护栏全过）。
+> - **画面**：**引子的网页层已经实现** —— `film/pages/intro.js` + `body.js` 的 `intro` 变体，帧 0–419 已渲到 `out/prelude/`。
+>   但**图形侧登记的还是管线自检画面**（`film/engine/content.js` 把四段都指向 `content/example.js`）：引子的画布部分与第一幕之后**都还没写**。
+>   分镜与画面规格是本地文档（`PersonalWorkaround/`，不提交）。
+> - **没做过的**：`--full`（4741 帧整片）没跑过（护栏快档只渲 48 帧验证链路）；**跨机器确定性没有验证**（只证明了同机、跨进程、跨 worker 数一致）；没有任何 PV 画面的视觉验收。
+> - 灵感与技术路线来自参考项目 [`world-execute-me-dsh-pv`](https://github.com/Misakazentai/world-execute-me-dsh-pv)（本地副本在 `PersonalWorkaround/`，不提交）。
 
 ## 素材与版权：仓库里有什么、没有什么
 
@@ -25,13 +20,13 @@
 | 东西 | 在仓库里？ | 说明 |
 |---|---|---|
 | 歌曲音频（原曲） | ❌ | 只在本机。`Resource/song.json` 存它的 sha256 |
-| 歌曲音频（母版，见下） | ❌ | 在本机用 `tools/trim-song.mjs`（计划中）生成，同样只留 sha256 |
+| 歌曲音频（母版，见下） | ❌ | 由 `tools/trim-song.mjs` 在本机生成，同样只留 sha256 |
 | 歌词原文 | ❌ | `input/song.lrc` 已在本机（`*.lrc` 被忽略）；文本不随仓库分发 |
 | 内嵌封面 | ❌ | 原件 ID3v2.3 里自带约 2 MB 封面；不随仓库分发 |
 | 指纹 | ✅ | `Resource/song.json` + `Resource/README.md` |
-| dsh 前端（截图素材） | ✅ | `film/vendor/dsh-web-frontend/` —— `@deepseek-ai/dsh-web-frontend 0.1.7-rc.2`，MIT，Copyright (c) 2026 DeepSeek |
+| dsh 界面素材 | ✅ | `film/vendor/`：`dsh-web-frontend`、`dsh-client-ui-theme`、`dsh-client-ui-cordis`（各 `0.1.7-rc.2`，MIT，DeepSeek）与**抽取出来的** `dsh-css/` |
 | 代码 | ✅ | MIT（[LICENSE.txt](LICENSE.txt)） |
-| 参考项目的字体 / 立绘 | ❌ | 各有许可条件，复制前先确认，不要顺手搬进来 |
+| 参考项目的立绘 / 字体 | ❌ | 各有许可条件，复制前先确认，不要顺手搬进来 |
 
 ## 音频：为什么要两个 sha256
 
@@ -49,12 +44,10 @@
 | 覆盖的视频帧 @24 fps | 4741.632 → 取 4741 | 4741（多 2.33 ms） |
 
 ```bash
-# 计划中（Node 移植版，Phase 1）
 node tools/trim-song.mjs make  --src input/song.mp3 --out input/song.master.mp3 --fps 24
 node tools/trim-song.mjs check --src input/song.mp3 --master input/song.master.mp3   # 两步校验
 
-# 过渡期：Python 版仍可跑（纯标准库，只用系统解释器；Phase 1 完成后删除）
-python tools/trim_song.py check --src input/song.mp3 --master input/song.master.mp3
+node tools/trim-song-parity.mjs   # 与过渡期的 Python 版逐字节对拍（需要系统 Python 在场）
 ```
 
 - **第 1 步（原曲 sha256）对不上只警告**：发行版可能有多种转码，仍能出片，但唱词与切点会漂移。
@@ -63,56 +56,83 @@ python tools/trim_song.py check --src input/song.mp3 --master input/song.master.
 - 已知怪癖（脚本会打印）：原件 Xing/Info 头 `frames=8231` 而 `bytes` 等于 8232 帧，头部自身差一帧；
   母版默认不改头部（以保住字节前缀性质），于是 **ffprobe 给原曲和母版报的时长都是 197.504 s**（读头部，分不出这两份文件）。
 - **别用 `-shortest` 定片长**：实测它会按 197.504 s 切，把 4741 帧的成片变成 **4739 帧**；
-  用 `-t 197.5416667` 或 `-frames:v 4741`，片长由帧数决定。
-- 帧率已锁 **24 fps**（母版与这两个 sha256 就是按它算的）。真要改 fps，母版必须重新生成、指纹必须更新。
+  片长由帧数决定（`-frames:v 4741` 或 `-t round(END_T*FPS)/FPS`），渲染器已经这么做。
+- 帧率已锁 **24 fps / 1920×1080 原生**。真要改 fps，母版必须重新生成、指纹必须更新。
+- `tools/trim_song.py` 是**过渡件**（纯标准库，用系统解释器），Node 版接替后由作者决定是否删除。
 
 ## 仓库结构
 
-| 路径 | 内容 | 提交 |
-|---|---|---|
-| `Resource/` | `song.json`（两步指纹 + 参数 + 已知怪癖）、`README.md`（为什么这里没有原件） | ✅ |
-| `film/vendor/dsh-web-frontend/` | 截图用的 dsh 前端（MIT，DeepSeek）；**不要硬编码里面的 hash 文件名**，扫目录现取 | ✅ |
-| `film/`（其余） | 出片代码：`kit/`（图形原语）→ `engine/`（时间线/图层）→ `content/`（场景）→ `pages/`（左侧截图）→ `compose/`（合成）—— **计划中** | ✅ |
-| `tools/trim_song.py` | 母版的生成/校验（纯标准库）—— **过渡件**，Phase 1 由 `tools/trim-song.mjs` 取代后删除 | ✅ |
-| `tools/lyrict/` | 上游 `AverageHoarder/lyrict` 的 vendored 副本（MIT）。**当前不可运行**：它是 Python 包，本仓库已移除 Python 环境 | ✅ |
-| `package.json` | Node 侧依赖。现在只有 `playwright`（精确锁 1.63.0）；`@napi-rs/canvas` 与 `scripts` 见施工说明 §4.1 | ✅ |
-| `input/` | 本机输入：`song.mp3`、`song.master.mp3`、`song.lrc`；除 `README.md` 外全部忽略 | ❌ |
-| `data/`、`out/` | 时间轴清单 / 产物 —— **计划中** | ✅ / ❌ |
-| `PersonalWorkaround/` | 个人/临时工作区：参考项目副本、mp3 原件、复盘与施工说明 | ❌ |
+| 路径 | 内容 |
+|---|---|
+| `film/kit/` | 图形原语：画布与图层、位图算子（LUT / box 降采样 / 可分离高斯 / Sobel）、字形图集与文本、调色、噪声、后期 |
+| `film/engine/` | `clock.js`（常量唯一来源）、`timeline.js`（段表 + 断言）、`layers.js`（六层顺序）、`content.js`（**内容的唯一注册点**）、`frame.js`（`frame(n, prev)`）、`camera.js`、`transitions.js` |
+| `film/content/` | 图形侧场景。**现在只有 `example.js`（管线自检）；引子的画布部分还没写** |
+| `film/pages/` | 网页层：**`intro.js`（引子的真页面，帧 0–419）**、`body.js`（`body(t) -> HTML`，`intro` / `probe` 两个变体）、`gen-frames.js`（→ frames.json + 舞台）、`shot.mjs`（Playwright 截图器）、`preview.mjs`（全览表 + 预览片）、`extract-css.mjs`（抽 dsh CSS → `vendor/dsh-css/`）、`dsh-*.js` |
+| `film/compose/` | 把网页截图当图层接进图形侧：`overlay.js`、`lead.js`（主导权）、`shots.js`（缺帧报错）、`track-layer.js` |
+| `film/lib/` | `ffmpeg-path.js`（三级路径解析）、`frame-segments.js`、`render-worker.js`、`static-server.js` |
+| `film/{check,guard,hash,render,render-video}.js` | 自检、全量护栏、帧哈希清单、单帧渲染、分段渲染 + 编码 |
+| `film/test/` | 测试与探针：`run.js`（测试入口）与各套件、`perf-baseline.js`、若干一次性 probe |
+| `film/vendor/` | dsh 的 MIT 素材：三个包副本 + 抽取出来的 `dsh-css/`（见该目录的 README） |
+| `tools/trim-song.mjs`、`trim-song-parity.mjs` | 母版修剪（Node）与两版对拍 |
+| `Resource/`、`input/` | 指纹 / 本机输入（音频、歌词；除 `README.md` 外全部忽略） |
+| `out/` | 产物：帧、预览、成片、护栏报告 |
 
 目录名定下后**不要改名**：代码之间靠相对位置互相找到（参考项目的教训）。
 
 ## 快速开始
 
-需要：**Node 20+**（本机 24.x）与 **ffmpeg 在 PATH 里**。渲染侧不再需要 Python —— `tools/trim_song.py` 是过渡件，只用到系统解释器。
-PowerShell 下 `npm` / `npx` 要用 `.cmd` 后缀（执行策略禁用了 `.ps1`）。
+需要 **Node 20+**（本机 24.x）与 **ffmpeg 在 PATH 里**。PowerShell 下 `npm` / `npx` 要用 `.cmd`（执行策略禁用了 `.ps1`）。
 
 ```bash
-npm.cmd install                            # Node 依赖
-npx.cmd playwright install chromium        # 浏览器
+npm.cmd install && npx.cmd playwright install chromium
 
-node film/check.js                         # 【计划中】环境与素材自检：ffmpeg 路径、两步 sha256、依赖可用性
-node tools/trim-song.mjs check --src input/song.mp3 --master input/song.master.mp3   # 【计划中】母版校验
-
-node film/pages/gen-frames.js              # 【计划中】逐帧 HTML → frames.json
-node film/pages/shot.mjs                   # 【计划中】确定性截图
-node film/render-video.js                  # 【计划中】逐帧绘制 → 合成 → out/film.mp4
-npm.cmd run all                            # 【计划中】check + pages + render
+npm.cmd run check      # 环境与素材自检：ffmpeg 路径、两步 sha256、Playwright、vendor sha256（退出码 0/1/2）
+npm.cmd test           # 测试套件
+npm.cmd run guard      # 全量护栏（快档：静态检查 + 48 帧真渲）；guard:full 才是 4741 帧
+npm.cmd run trim -- check --src input/song.mp3 --master input/song.master.mp3
 ```
 
-只重渲某几帧（参考项目最实用的开关，务必保留）：
+**看一眼画面**（引子那 419 帧）：
 
 ```bash
-node film/render-video.js --frames 2769,2770,2800
-node film/render-video.js --range 100 200
+npm.cmd run prelude    # gen-frames 0–419 → shot 截图 → preview 出全览表与预览片
+npm.cmd run preview -- --range 0 419        # 也可以单独重出预览
+npm.cmd run smoke                           # 10 帧冒烟：只验"同一 n 渲两次逐像素一致"
 ```
+
+产物在 `out/prelude/`（PNG + `shots.json`）与 `out/preview/`（`sheet-*.png` 全览表、`preview-*.mp4` 预览片、逐帧变化表）。
+预览片是**有损编码、只为看得见**，不是成片管线。
+
+**出片**：
+
+```bash
+npm.cmd run render                          # 分段渲染 + concat + 混音 → out/film.mp4
+npm.cmd run render -- --range 100 200       # 只渲一段
+npm.cmd run render -- --frames 2769,2770,2800
+npm.cmd run master                          # 无损母版 out/film.master.mkv + 交付转码
+npm.cmd run all                             # check + test + pages + render
+```
+
+`film/render-video.js --manifest` 会另出 `out/frames.sha256`（每帧一行），用于跨机器比对。
+
+## 护栏与验证到哪一步
+
+| 命令 | 覆盖 |
+|---|---|
+| `node film/check.js` | 素材两步 sha256 + 母版字节前缀、ffmpeg/ffprobe 实际路径、Playwright 浏览器、vendor 四个文件的 sha256 |
+| `node film/test/run.js` | 单元与集成测试（时间线断言、图形算子对拍、图层与后期、截图侧、合成、渲染护栏） |
+| `node film/guard.js` | `AGENTS.md` §8 的全表：三条 ⭐（帧数对账 / 同帧双渲 / 时间线断言）+ 成片帧数、空白帧、禁止随机、无猴补丁、依赖精确锁、仓库卫生、BT.709 标记等 |
+
+**诚实边界**：护栏默认是快档（静态检查 + 48 帧真渲），`--full` 的 4741 帧整片**没跑过**；
+确定性只在**同机、跨进程、跨 worker 数**下验证过，**跨机器没有验证**（Skia 在不同 CPU 上可能走不同 SIMD 路径）；
+边界帧抽查会出图，但"需要人眼看一遍"这件事机器只能提醒，不能代替。
 
 ## 关于歌词 `.lrc`
 
-`input/song.lrc` 已经在本机（`.gitignore` 忽略 `*.lrc`，歌词文本不随仓库分发）。如果它是音乐软件**写进音频标签**里、
-需要用工具取出来的那种，本仓库的 `tools/lyrict/`（vendored 上游，MIT）本来就是干这个的 —— 但它现在是 Python 包，
+`input/song.lrc` 已经在本机（`.gitignore` 忽略 `*.lrc`，歌词文本不随仓库分发）。
+`tools/lyrict/`（vendored 上游，MIT）是导出/写入歌词标签的工具，但它现在是 Python 包，
 **本仓库已移除 Python 环境**，要跑得自己临时建一个 venv 装 `mutagen` + `tqdm`。
-因为 `.lrc` 已在手上，它**不阻塞出片**；逐词时间轴（要不要、用哪个版本）仍然是 🚧 未定，属于收尾阶段的事。
+它不阻塞出片；逐词时间轴（要不要、用哪个版本）仍然未定，`data/timing/` 也还没落地。
 
 ## 技术要点
 
@@ -122,14 +142,15 @@ node film/render-video.js --range 100 200
 2. **每一帧都是 `t` 的纯函数**：残影/运动模糊把上一帧作为**参数**传入，并行与「只重渲几帧」才成立。
 3. **确定性优先于性能**：不确定的帧等于错的帧；慢可以并行，抖无法补救。
 
-几个关键经验（细节见 [AGENTS.md](AGENTS.md)）：
+几个关键约束（细节见 [AGENTS.md](AGENTS.md)）：
 
+- **段区间半开 `[start, end)`**，边界帧归后一段；**画面轴与声音轴是两张独立的段表**，各自半开、各自无重叠。
 - **Web 侧七个焊点**：等字体就绪、等图片 decode、用 Web Animations 把 CSS 动画钉在 `t` 上、相同 body 不重写 DOM、首帧多等、固定 viewport、资源全部本地。少一个，帧就会闪。
-- **图形侧图层纪律**：背景 → 内容 → 载具 → **角色层（独立 RGBA）** → 框 → 后期。角色独立成层才能在合成器里推拉、滑出、隔离。
+- **图形侧六层**：背景 → 内容 → 载具 → **角色层（独立画布）** → 框 → 后期。角色独立成层，才能对它做推拉、滑出、隔离。
 - **后期四件套**：残影用 `max`（`globalCompositeOperation='lighten'`）而不是 `blend`、辉光 = 模糊后加回自己、扫描线与暗角要缓存、暗角在小图上算完再放大。
-- **逐格延迟转场**：`reveal(old, new, t, delay)` 一个实现 + `radial` / `inward` / `sweep` 三个 `delay` 函数，覆盖十几个转场。
+- **逐格延迟转场**：`reveal(old, new, t, delay)` 一个实现 + `radial` / `inward` / `sweep` / `dissolve` 四个 `delay`。
 - **没有 `Image.BOX` 等价物**：降采样到字符网格必须手写区域平均，别用 `drawImage` 缩小去凑。
-- **验证护栏**：帧数对账（本片 @24 fps 是 **4741** 帧）、同帧双渲逐像素比对、时间线断言。这三条能挡住绝大多数「渲完才发现某段是黑的」。
+- **全片无声**（只有歌声），因此一帧硬切就是最大音量；同一时刻在场通道 ≤ 3。
 
 ## 与参考项目的差异
 
@@ -137,23 +158,34 @@ node film/render-video.js --range 100 200
 |---|---|---|
 | 曲目 | Mili - world.execute(me);（211.913 s） | 69岁牢二次元 - unhappy（69岁牢二次元 remix）（197.568 s） |
 | 语言 / 运行时 | Python 3 + Pillow + NumPy，GPU 后期走 torch | **纯 Node.js**：`@napi-rs/canvas`（Skia）+ `worker_threads`，v1 不做 GPU |
-| 帧率 / 尺寸 | 24 fps / 1280×720 | **24 fps / 1920×1080 原生**（2026-10-01 定） |
-| 音频处理 | 直接用歌曲（`data/song.json` 只记 sha256） | 先删尾部小数帧得到母版，原曲 + 母版**两步** sha256 |
-| 架构 | 内存猴补丁替换宿主函数 | 显式接口，不猴补丁（从零写，没有这个约束） |
-| 素材策略 | 歌词只存时间不存文本、舞者用替身 | 沿用 sha256 门禁；歌词与角色方案 🚧 未定 |
-| 「她」的形象 | 鲸鱼娘（CC BY-NC-SA 4.0） | 🚧 未定（不打算直接搬替身素材） |
+| 帧率 / 尺寸 | 24 fps / 1280×720 | **24 fps / 1920×1080 原生** |
+| 音频处理 | 直接用歌曲（只记 sha256） | 先删尾部小数帧得到母版，原曲 + 母版**两步** sha256 |
+| 架构 | 内存猴补丁替换宿主函数 | 显式接口：`content.js` 是唯一注册点，`compose/track-layer.js` 用注入而非改写 |
+| 界面素材 | 抽取组件 CSS 提交 | 三个 MIT 包副本 + 抽取出的 `dsh-css/` 快照（另一台机器不需要装 dsh 也能构建网页层） |
+| 素材策略 | 歌词只存时间不存文本、舞者用替身 | 沿用 sha256 门禁；歌词与结尾方案仍未定 |
 
 ## 许可
 
 - **代码**：[MIT](LICENSE.txt) · Copyright (c) 2026-Present Pen-NineCat。
-- **vendored 的 dsh 前端**（`film/vendor/dsh-web-frontend/`）：MIT，Copyright (c) 2026 DeepSeek；内含字体按各自的 OFL 条款（见同目录 `assets/fonts/`）。
+- **参考代码** `world-execute-me-dsh-pv`：[MIT](https://github.com/MisakaZentai/world-execute-me-dsh-pv/blob/main/LICENSE) · Copyright (c) 2026 MisakaZentai。
+- **vendored 的 dsh 素材**（`film/vendor/`）：[MIT](https://github.com/deepseek-ai/deepseek-harness/blob/master/LICENSE) · Copyright (c) 2026 DeepSeek；
+  三个包副本各自带 `LICENSE`，字体按分发的 OFL 条款（`dsh-web-frontend/assets/fonts/Montserrat-OFL.txt`）。
+  `dsh-css/` 是我们抽出来的快照，内容同属 dsh。
 - **vendored 的 `tools/lyrict/`**：MIT，版权归上游 `AverageHoarder/lyrict`。
 - **音乐与歌词**：不随仓库分发，本项目不授予任何再许可。
 
-## 署名与声明
+## 署名，致谢与声明
 
 - **音乐**：69岁牢二次元 - unhappy（69岁牢二次元 remix）
-- **参考与灵感**：`world-execute-me-dsh-pv`（MisakaZentai）及其复盘文档；界面致敬 DeepSeek Harness（dsh）
+
+  [[AI扩写]嫌一分半的Unhappy太短？AI扩写到三分半的听个爽！](https://www.bilibili.com/video/BV193dZBxE93/)
+
+  由衷感谢「69岁牢二次元」大佬提供该 remix 的曲子。
+
+- **参考与灵感**：[`world-execute-me-dsh-pv`](https://github.com/Misakazentai/world-execute-me-dsh-pv)（MisakaZentai）及其复盘文档；界面致敬 DeepSeek Harness（dsh）。
+
+  由衷感谢「MisakaZentai」大佬提供的灵感与图形算子。
+
 - 本片是**非官方同人作品**，与 DeepSeek、曲作者没有从属或合作关系，也未经其认可。
 
 协作者（尤其是 AI 代理）请先读 [AGENTS.md](AGENTS.md)：里面有硬规则、素材事实与验证护栏。

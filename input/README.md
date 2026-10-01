@@ -22,10 +22,8 @@ Copy-Item "..\PersonalWorkaround\69岁牢二次元 - unhappy（69岁牢二次元
 片子按整数个视频帧渲染，所以先把尾部的小数帧删掉：
 
 ```bash
-# 过渡期：纯标准库，用系统解释器（本仓库已移除 Python 环境）
-python tools/trim_song.py make --src input/song.mp3 --out input/song.master.mp3 --fps 24
-# 目标形态：Phase 1 的 Node 移植
 node tools/trim-song.mjs make --src input/song.mp3 --out input/song.master.mp3 --fps 24
+# 过渡期的 Python 版仍可跑（纯标准库，用系统解释器）：python tools/trim_song.py make ...
 ```
 
 | 项目 | 值 |
@@ -38,7 +36,7 @@ node tools/trim-song.mjs make --src input/song.mp3 --out input/song.master.mp3 -
 每次出片前跑一次两步校验：
 
 ```bash
-python tools/trim_song.py check --src input/song.mp3 --master input/song.master.mp3
+node tools/trim-song.mjs check --src input/song.mp3 --master input/song.master.mp3
 ```
 
 - 第 1 步（原曲）对不上只警告；第 2 步（母版）对不上必须停下来重做，别出片。

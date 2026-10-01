@@ -23,7 +23,7 @@
     "video_frames": 4741,
     "fps": 24,
     "overshoot_s": 0.002333,
-    "made_by": "python tools/trim_song.py make --src <原曲> --out <母版> --fps 24（过渡期，纯标准库；Phase 1 后接替为 node tools/trim-song.mjs）",
+    "made_by": "node tools/trim-song.mjs make --src <原曲> --out <母版> --fps 24（与过渡期的 python tools/trim_song.py 逐字节对拍过）",
     "method": "字节级截断：保留 ID3v2 标签与第 1 个 MPEG 帧起的前 8231 帧，丢弃尾部 1088 字节。不重编码，所以 sha256 与机器、ffmpeg 版本无关。",
     "invariant": "母版 == 原曲的前 9971148 字节（可手工复核：sha256(原曲[:9971148])）",
     "note": "成片按这份文件对齐，时间零点 = 它的第一个解码采样。母版同样只在本地。"
@@ -31,7 +31,7 @@
   "check": {
     "step1": "原曲 sha256 == source.sha256：确认你手上是哪一份原件。不匹配只警告（可能仍能出片，但唱词与切点会漂移）。",
     "step2": "母版 sha256 == master.sha256：时间轴可信。不匹配必须停下来重新生成母版，不要出片。",
-    "command": "python tools/trim_song.py check --src input/song.mp3 --master <母版>（过渡期；目标形态 node tools/trim-song.mjs check …）"
+    "command": "node tools/trim-song.mjs check --src input/song.mp3 --master <母版>（过渡期仍可用 python tools/trim_song.py check …）"
   },
   "known_quirks": {
     "xing_info_header": "原件首帧带 Xing/Info 头：frames=8231，但 bytes=7902720 恰好是 8232 帧的字节数 —— 原件头部两个字段自身差一帧。",
