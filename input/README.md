@@ -22,7 +22,10 @@ Copy-Item "..\PersonalWorkaround\69岁牢二次元 - unhappy（69岁牢二次元
 片子按整数个视频帧渲染，所以先把尾部的小数帧删掉：
 
 ```bash
+# 过渡期：纯标准库，用系统解释器（本仓库已移除 Python 环境）
 python tools/trim_song.py make --src input/song.mp3 --out input/song.master.mp3 --fps 24
+# 目标形态：Phase 1 的 Node 移植
+node tools/trim-song.mjs make --src input/song.mp3 --out input/song.master.mp3 --fps 24
 ```
 
 | 项目 | 值 |
@@ -40,8 +43,10 @@ python tools/trim_song.py check --src input/song.mp3 --master input/song.master.
 
 - 第 1 步（原曲）对不上只警告；第 2 步（母版）对不上必须停下来重做，别出片。
 - 时间零点 = 母版第一个解码采样。片头静音多出或少掉一段，唱词与镜头会整体推后或提前；必要时先用 ffmpeg 裁齐。
-- 帧率还没定（🚧）。**fps 一改，母版就要重新生成**，sha256 也会变。
+- 帧率已锁 **24 fps**（母版与 sha256 按它算）。真要改 fps，母版必须重新生成、sha256 也会变。
 
-## lyrics.lrc（可选）
+## song.lrc（可选）
 
-需要逐词时间轴时，把你的 LRC 放在这里。歌词文本只在本机参与合成，生成物同样在 `.gitignore` 里，不会被提交。
+本机已经有一份 `input/song.lrc`（`.gitignore` 忽略 `*.lrc`，歌词文本不随仓库分发）。
+逐词时间轴要不要用、用哪个版本仍是 🚧；`tools/lyrict/` 那个 vendored 歌词工具**当前不可运行**
+（它是 Python 包，本仓库已移除 Python 环境），需要时自建临时 venv。

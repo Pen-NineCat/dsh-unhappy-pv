@@ -54,6 +54,8 @@ __pycache__/
 # uv / setuptools 的本地安装与构建产物
 *.egg-info/
 .pytest_cache/
+# `pip install ./tools/lyrict`（临时 venv 跑歌词工具时的做法）会在这里留一个 build/
+tools/lyrict/build/
 .env
 .env.*
 !.env.example

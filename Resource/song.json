@@ -23,7 +23,7 @@
     "video_frames": 4741,
     "fps": 24,
     "overshoot_s": 0.002333,
-    "made_by": "uv run python tools/trim_song.py make --src <原曲> --out <母版> --fps 24",
+    "made_by": "python tools/trim_song.py make --src <原曲> --out <母版> --fps 24（过渡期，纯标准库；Phase 1 后接替为 node tools/trim-song.mjs）",
     "method": "字节级截断：保留 ID3v2 标签与第 1 个 MPEG 帧起的前 8231 帧，丢弃尾部 1088 字节。不重编码，所以 sha256 与机器、ffmpeg 版本无关。",
     "invariant": "母版 == 原曲的前 9971148 字节（可手工复核：sha256(原曲[:9971148])）",
     "note": "成片按这份文件对齐，时间零点 = 它的第一个解码采样。母版同样只在本地。"
@@ -31,13 +31,13 @@
   "check": {
     "step1": "原曲 sha256 == source.sha256：确认你手上是哪一份原件。不匹配只警告（可能仍能出片，但唱词与切点会漂移）。",
     "step2": "母版 sha256 == master.sha256：时间轴可信。不匹配必须停下来重新生成母版，不要出片。",
-    "command": "uv run python tools/trim_song.py check --src input/song.mp3 --master <母版>"
+    "command": "python tools/trim_song.py check --src input/song.mp3 --master <母版>（过渡期；目标形态 node tools/trim-song.mjs check …）"
   },
   "known_quirks": {
     "xing_info_header": "原件首帧带 Xing/Info 头：frames=8231，但 bytes=7902720 恰好是 8232 帧的字节数 —— 原件头部两个字段自身差一帧。",
     "master_header": "母版默认不改头部，它的 bytes 字段仍写着 7902720（多于母版实际的 7901760）。实测 ffprobe 因此把原曲与母版都报成 197.504 s —— 读头部的工具分不出这两份文件，不能拿它的时长当帧数依据。要让头部自洽就加 --patch-info，但那会得到另一个 sha256（f119cfba9e606cef7e76a1429b5f5c54f77ece86526c9e337e21aa7b11c8e995），两者只能选一个固定下来。",
     "mux_shortest_trap": "实测（2026-10-01）：用 -shortest 混音会把 4741 帧的成片切成 4739 帧（ffprobe 报的音频 197.504 s 短于 4741/24 = 197.541667 s）。片长必须由帧数决定，用 -t 197.5416667 或 -frames:v 4741。",
-    "fps_dependency": "🚧 帧率未定：master 的数值依赖 24 fps。fps 一改，整数视频帧数与母版 sha256 都会变，必须重跑 tools/trim_song.py 并更新这里。"
+    "fps_dependency": "fps 已锁 24（2026-10-01）。master 的数值依赖 fps：真要改，整数视频帧数与母版 sha256 都会变，必须重跑修剪工具并更新这里。"
   },
   "verification": {
     "duration_source_of_truth": "上面 source / master 的时长是 MPEG 帧头解析的结果（帧数 × 1152 ÷ 48000），可复现；ffprobe 的读数与此不一致，见 known_quirks。",

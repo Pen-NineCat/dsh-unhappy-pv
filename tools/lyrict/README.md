@@ -85,41 +85,26 @@ All modes support logging and can show progress bars for most of the steps.
 
 ## How to install lyrict
 
-### In this repository (what you most likely want)
+### In this repository — **currently not runnable**
 
-`tools/lyrict/` is an ordinary Python package (a `src` layout plus
-`pyproject.toml`), but its dependencies are **not** managed separately: it is a
-member of the repository's `uv` workspace, declared in the root
-[`pyproject.toml`](../../pyproject.toml). One command at the repository root
-installs the main project *and* this tool *and* mutagen/tqdm:
+The repository's rendering pipeline moved to pure Node.js, so on 2026-10-01 its
+Python environment was removed: there is no root `pyproject.toml`, no `uv`
+workspace and no `.venv` to resolve. Any `uv sync` / `uv run lyrict` instructions
+that used to live here no longer apply.
 
-```bash
-uv sync          # from the repository root, once
-```
-
-That is the whole setup. Afterwards, from anywhere in the repository:
-
-```bash
-uv run lyrict -m test -d "D:/Music"     # uv resolves the workspace environment
-uv run python -m lyrict --version       # same thing, module form
-```
-
-or activate the environment once and drop the `uv run`:
+This vendored copy is kept (small, MIT, and possibly wanted again for exporting
+or importing lyric tags). To run it, build a throwaway environment **outside the
+repository** — `.gitignore` covers `.venv` only, so a venv created in the repo
+would show up as an untracked directory:
 
 ```powershell
-.venv\Scripts\Activate.ps1               # Windows; on Linux/macOS: source .venv/bin/activate
-lyrict -m test -d "D:/Music"
+python -m venv "$env:TEMP\lyrict-venv"
+& "$env:TEMP\lyrict-venv\Scripts\pip" install ./tools/lyrict   # pulls mutagen + tqdm
+& "$env:TEMP\lyrict-venv\Scripts\lyrict" -m test -d input
 ```
 
-Notes:
-
-* Run `uv sync` at the **repository root**. There is nothing to do inside
-  `tools/lyrict/`; `uv sync --directory tools/lyrict` would sync *only* this
-  member into the same `.venv` and leaves the main project uninstalled again.
-* There is no second environment and no second `uv.lock`: the repository root
-  has the only lock file, covering the main project and this member.
-* `uv run lyrict ...` is equivalent to `python -m lyrict ...`; the console
-  command and the module entry point call the same `cli()` function.
+Nothing in the rendering pipeline depends on this tool: `input/song.lrc` is
+already on hand.
 
 ### Standalone (outside this repository)
 
@@ -366,7 +351,7 @@ arguments and output are unchanged:
 |---|---|---|
 | layout | one `lyrict.py` you copy around | `src/lyrict/` package with `pyproject.toml` |
 | call it | `python lyrict.py -m ...` | `lyrict -m ...` or `python -m lyrict -m ...` |
-| dependencies | install mutagen/tqdm yourself | declared in `pyproject.toml`, installed by the repository's `uv sync` |
+| dependencies | install mutagen/tqdm yourself | declared in its own `pyproject.toml` (`pip install ./tools/lyrict` pulls them) |
 | version | none published | `lyrict --version` (placeholder `0.0.0+vendored`) |
 
 Also changed:
@@ -398,9 +383,14 @@ Also changed:
 `tests/` contains a stdlib-only test suite and the fixture generator it uses
 (tiny synthetic .mp3/.flac files, no audio, no real lyrics):
 
-```bash
-uv run python tools/lyrict/tests/test_lyrict.py        # 13 checks, no extra dependency
-uv run --with pytest pytest tools/lyrict               # same tests via pytest, if you prefer
+This repository no longer has a Python environment (see "In this repository"
+above), and the suite imports `mutagen`, so use a throwaway interpreter — it
+needs the dependencies but no test framework:
+
+```powershell
+python -m venv "$env:TEMP\lyrict-venv"
+& "$env:TEMP\lyrict-venv\Scripts\pip" install ./tools/lyrict
+& "$env:TEMP\lyrict-venv\Scripts\python" tools\lyrict\tests\test_lyrict.py   # 13/13 passed, 2026-10-01
 ```
 
 `tests/make_fixture.py <dir>` writes the same fixture to a directory of your
