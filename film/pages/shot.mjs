@@ -37,7 +37,8 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve as resolvePath } from 'node:path';
 
-import { END_T, FPS, FRAME_COUNT, describe as describeClock } from '../engine/clock.js';
+import { END_T, FPS, FRAME_COUNT, H, describe as describeClock } from '../engine/clock.js';
+import { leftWidthAt } from '../engine/layout.js';
 import { VARIANTS } from './body.js';
 import { VENDOR_MOUNT } from './dsh-theme.js';
 // 浏览器启动参数**只有一份**（`film/lib/dsh-web.js`）：R1 与 R2 的截图必须同参数，
@@ -62,7 +63,7 @@ const HELP = [
   '  --variant <v>     页面变体：intro（默认，引子真页面）/ probe（回归夹具）',
   '  --width N          视口宽（CSS px），默认 960',
   '                    **合成要 1:1** 就得让它等于目标矩形的宽（§6 Phase 6 第 2 条）',
-  '  --height N         视口高（CSS px），默认 640',
+  '  --height N         视口高（CSS px）；默认 null = 画布高 1080',
   '  --dpr N            deviceScaleFactor，默认 2',
   '  --no-pin          **故意关掉焊点 3**（不 pause 动画）—— 用来证明它确实在起作用',
   '  --warmup-ms N     首帧额外等待，默认 150',
@@ -86,8 +87,10 @@ function parseArgs(argv) {
     pin: true,
     warmupMs: 150,
     tracks: /** @type {string[]} */ ([]),
-    width: 960,
-    height: 640,
+    // null = **按 engine/layout.js 逐帧算**（§2.1 U3：满屏 1920×1080 → 帧 350–418 收到左格 1152×1080）。
+    // 给死值才用它 —— 那时整段都按那个尺寸渲（旧行为）。
+    width: /** @type {?number} */ (null),
+    height: /** @type {?number} */ (null),
     dpr: 2,
     variant: 'intro',
   };
@@ -207,6 +210,9 @@ async function decodePng(png) {
  * @returns {Promise<{n: number, png: Buffer, hash: string, rewritten: boolean, meta: any}>}
  */
 async function renderOne(page, n, opt) {
+  // ⭐ 先按当前帧的矩形设 viewport（§2.1 U3：**"缩"不是缩放位图，是窗口真的在变小**）。
+  //   必须在 setBody/setScroll **之前**：改窗口会触发重排、并把 scrollTop 冲掉。
+  if (opt.sizeFn) await page.setViewportSize(opt.sizeFn(n));
   const html = opt.bodyFn(n);
   const scroll = opt.scrollFn(n);
 
@@ -473,9 +479,14 @@ async function main() {
   //（@media (prefers-reduced-motion:reduce){…animation:none}），焊点 3 就没靶子了。
   const browser = await chromium.launch({ headless: true, args: LAUNCH_ARGS });
 
-  // 焊点 6：固定 viewport 与 deviceScaleFactor（全程不变，改一处就够）
-  // 焊点 6：固定 viewport 与 deviceScaleFactor（全程不变，改一处就够）
-  const viewport = { width: o.width, height: o.height };
+  // 焊点 6 的更新说明（§2.1 U3 之后）：deviceScaleFactor 全程不变，
+  // 但 viewport 尺寸逐帧在变 —— 那不是"没焊住焊点 6"，而是设计要的"窗口真的在变小"。
+  // 初始 viewport 取第一帧的尺寸，之后每帧由 renderOne 的 sizeFn 设。
+  const first = o.frames[0];
+  const viewport =
+    o.variant === 'probe'
+      ? { width: 960, height: 640 }
+      : { width: o.width ?? leftWidthAt(first), height: o.height ?? H };
   const deviceScaleFactor = o.dpr;
   const pages = await Promise.all(
     Array.from({ length: o.pages }, () =>
@@ -488,12 +499,23 @@ async function main() {
     await p.goto(`${srv.url}stage.html`, { waitUntil: 'load' });
   }
 
-  // 页面必须知道自己的视口尺寸：引子的滚动窗口高 = 视口高 − 固定区高，是算出来的（见 intro.js）
+  // 页面必须知道自己的视口尺寸：引子的滚动窗口高 = 视口高 − 固定区 − 输入框，都是算出来的（见 intro.js）。
+  // ⭐ `intro` 变体的尺寸**逐帧不同**：满屏 1920×1080 → 帧 350–418 收到左格 1152×1080（§2.1 U3），
+  //   宽度与图形层共用 `engine/layout.js` —— 差一像素就是重采样，"1:1 贴入"那条判据当场破。
+  //   `probe` 变体是固定尺寸的夹具（尺寸由它自己的 CSS 决定）。
+  const sizeFn =
+    o.variant === 'probe'
+      ? () => ({ width: 960, height: 640 })
+      : (/** @type {number} */ k) => ({ width: o.width ?? leftWidthAt(k), height: o.height ?? H });
   const opt = {
     pin: o.pin,
     warmupMs: o.warmupMs,
-    bodyFn: (/** @type {number} */ k) => body(k, { variant: o.variant, width: o.width, height: o.height }),
-    scrollFn: (/** @type {number} */ k) => scrollAtFrame(k, { variant: o.variant, height: o.height }),
+    sizeFn,
+    bodyFn: (/** @type {number} */ k) => {
+      const s = sizeFn(k);
+      return body(k, { variant: o.variant, width: s.width, height: s.height });
+    },
+    scrollFn: (/** @type {number} */ k) => scrollAtFrame(k, { variant: o.variant, height: sizeFn(k).height }),
   };
   /** @type {{n: number, file: string, hash: string, rewritten: boolean, meta: any}[]} */
   const entries = [];

@@ -15,7 +15,7 @@
 import { createCanvas } from '@napi-rs/canvas';
 
 import { FRAME_COUNT, H, W, timeAt } from '../engine/clock.js';
-import { buildTimeline, PRELUDE_MARKS } from '../engine/content.js';
+import { ACT_MARKS, buildTimeline, PRELUDE_MARKS } from '../engine/content.js';
 import { frame } from '../engine/frame.js';
 import { frameHash } from '../hash.js';
 import { assertRgb24Buffer, assertSize, rawRGB } from '../kit/pixels.js';
@@ -86,14 +86,21 @@ describe('Phase 3 · rgb24 边界（「花屏」的唯一原因）', () => {
 });
 
 describe('Phase 3 · 时间线段边界必须落在真实拍点上', () => {
-  test('时间线四段的边界 = 0 / 144 / 251 / 419 / 4741', () => {
+  test('画面轴四段的边界 = 0 / 419 / 1903 / 2454 / 4741（半开，`AGENTS.md` §2 规则 13）', () => {
     const table = buildTimeline();
     eq(table.length, 4, '段数');
     eq(table[0].start, 0, '第 1 段起点');
-    eq(table[0].end, timeAt(PRELUDE_MARKS.think), '第 1 段终点 = 帧 144');
-    eq(table[1].end, timeAt(PRELUDE_MARKS.output), '第 2 段终点 = 帧 251');
-    eq(table[2].end, timeAt(PRELUDE_MARKS.firstLyric), '第 3 段终点 = 帧 419（开词帧）');
+    eq(table[0].end, timeAt(ACT_MARKS.act1), '第 1 段终点 = 帧 419（开词帧，属于下一段）');
+    eq(table[1].end, timeAt(ACT_MARKS.interlude), '第 2 段终点 = 帧 1903');
+    eq(table[2].end, timeAt(ACT_MARKS.act2), '第 3 段终点 = 帧 2454（**画面轴**；声音轴是 2366）');
     eq(table[3].end, timeAt(FRAME_COUNT), '第 4 段终点 = 片尾');
+    // ⭐ 画面轴的账（作者 2026-10-01 拍板，A6）：419 + 1484 + 551 + 2287 = 4741
+    eq(Math.round((table[1].end - table[1].start) * 24), 1484, '第一幕该是 1484 帧（1903 − 419）');
+    eq(Math.round((table[2].end - table[2].start) * 24), 551, '幕间该是 551 帧（2454 − 1903，含 88 帧尾巴）');
+    eq(Math.round((table[3].end - table[3].start) * 24), 2287, '第二幕该是 2287 帧（4741 − 2454）');
+    // ⚠️ 两条轴在 [2366, 2454) 错位：声音已经进第二幕（她的前两句是**画外音**），画面还在幕间。
+    //    `AGENTS.md` §2 规则 13：两张独立的段表，各自半开、各自无重叠 —— 这不是冲突。
+    eq(ACT_MARKS.act2 > 2366, true, '画面轴的第二幕比声音轴晚 88 帧（§2.3 的错位区）');
   });
 
   test('⭐ 帧数对账：各段求和 == 4741', () => {
@@ -102,18 +109,23 @@ describe('Phase 3 · 时间线段边界必须落在真实拍点上', () => {
     eq(sum, FRAME_COUNT, '各段帧数求和');
   });
 
-  test('每个拍点的首帧属于**新**那一段（边界是左闭右开）', () => {
+  test('每个段边界帧属于**新**那一段（半开 `[start, end)`，`AGENTS.md` §2 规则 13）', () => {
     const table = buildTimeline();
+    // 三个边界各自归后一段：419 → 第一幕、1903 → 幕间、2454 → 第二幕
     const marks = [
-      [PRELUDE_MARKS.think, 1],
-      [PRELUDE_MARKS.output, 2],
-      [PRELUDE_MARKS.firstLyric, 3],
+      [ACT_MARKS.act1, 1],
+      [ACT_MARKS.interlude, 2],
+      [ACT_MARKS.act2, 3],
     ];
     for (const [n, wantIdx] of marks) {
       const t = timeAt(n);
       const idx = table.findIndex((s) => t >= s.start && t < s.end);
       eq(idx, wantIdx, `帧 ${n} 该落在第 ${wantIdx} 段`);
+      // 而且它**不**属于前一段（半开区间的另一半含义）
+      eq(t < table[wantIdx - 1].end, false, `帧 ${n} 不该落在第 ${wantIdx - 1} 段里`);
     }
+    // 引子的拍点仍在（页面侧的拍点，不再是段边界）
+    eq(Math.round(timeAt(PRELUDE_MARKS.firstLyric) * 24), 419, '开词帧仍是 419');
   });
 });
 

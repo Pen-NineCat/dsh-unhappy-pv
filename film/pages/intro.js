@@ -36,7 +36,8 @@
  * - 那段 context 文档**不是本仓库的 `AGENTS.md`**，是一份为片子写的文件（§1.8）。
  */
 
-import { FPS, FRAME_COUNT, timeAt } from '../engine/clock.js';
+import { FPS, FRAME_COUNT, H, timeAt } from '../engine/clock.js';
+import { ACT1, CONTEXT_EVENTS, thinkGroup } from './act1.js';
 
 /**
  * 引子的拍点（帧号）。**必须与 `film/engine/content.js` 的 `PRELUDE_MARKS` 一致** ——
@@ -317,6 +318,9 @@ export const LYRIC_INDEX_IN_THINK = LYRIC_AT;
 /** 文档总行数。 */
 export const TOTAL_LINES = BLOCKS.reduce((s, b) => s + b.lines.length, 0);
 
+/** 全文档（引子 + 第一幕）的总行数。 */
+export const TOTAL_LINES_ALL = () => allBlocks().reduce((s, b) => s + b.lines.length, 0);
+
 /**
  * 第 `k` 行（全文档连续编号，0 起）属于哪个块、块内第几行。
  * 用一次线性扫描回答 —— 行数是几十，不值得建索引。
@@ -325,7 +329,7 @@ export const TOTAL_LINES = BLOCKS.reduce((s, b) => s + b.lines.length, 0);
  */
 export function locateLine(k) {
   let rest = k;
-  for (const b of BLOCKS) {
+  for (const b of allBlocks()) {
     if (rest < b.lines.length) return { block: b, index: rest, thinkBodyPad: b.thinkBody ? THINK_BODY_PAD : 0 };
     rest -= b.lines.length;
   }
@@ -335,6 +339,32 @@ export function locateLine(k) {
 // ─────────────────────────────────────────────────────────────────────────────
 // 3. 逐帧的纯函数
 // ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * 文档的**全部块** = 引子的四块 + 第一幕的事件行（画面规格 §2.2）。
+ *
+ * 为什么放在一起：**它们是同一份对话文档** —— 引子写完就轮到第一幕，页面是同一个窗口，
+ * 只是固定区在 419 消失。分成两张表的话，「内容高 = 24 × 行盒数」这条
+ * （滚动位置可证明性的全部）就得在两处各维护一次。
+ *
+ * 注意：`act1.js` **不许** import 本文件（会成环）：它只从 `engine/clock.js` 拿 FPS。
+ * @returns {Block[]}
+ */
+export function allBlocks() {
+  return [
+    ...BLOCKS,
+    // 第一幕的"不属于思考链的内容"：各自一行，用同一套两端钉死的吐字曲线
+    ...CONTEXT_EVENTS.map((e) => ({
+      key: `act1-context-${e.n}`,
+      label: `第一幕 · ${e.note ?? 'context'}`,
+      start: e.n,
+      end: e.n + (e.grow ?? 12) - 1,
+      lines: [e.text],
+    })),
+    // 第一幕的思维链：**一个表头 + 四行**，行盒数由 `boxesAt` 直接给（见 act1.thinkGroup）
+    thinkGroup(),
+  ];
+}
 
 /**
  * 一个块一共多少个**字符**（行长之和）。
@@ -391,6 +421,10 @@ export function charsRevealed(b, n) {
  * @returns {Reveal}
  */
 export function revealAt(b, n) {
+  // 带 `boxesAt` 覆盖的块（现在只有第一幕的思维链组）自己回答"占几个行盒" ——
+  // 它的行分属不同事件帧，套不上"两端钉死的均匀曲线"；而**行盒数必须真的等于画出来的行数**，
+  // 否则「内容高 = 24 × 行盒数」（滚动位置可证明性的全部）会**静默**失效。
+  const override = /** @type {any} */ (b).boxesAt;
   const chars = charsRevealed(b, n);
   let rem = chars;
   let full = 0;
@@ -404,12 +438,12 @@ export function revealAt(b, n) {
         full,
         partial: line.slice(0, rem),
         partialIndex: full,
-        boxes: full + (rem > 0 ? 1 : 0),
+        boxes: override ? override(n) : full + (rem > 0 ? 1 : 0),
         chars,
       };
     }
   }
-  return { full, partial: '', partialIndex: -1, boxes: full, chars };
+  return { full, partial: '', partialIndex: -1, boxes: override ? override(n) : full, chars };
 }
 
 /**
@@ -421,7 +455,7 @@ export function revealAt(b, n) {
  */
 export function revealedLines(n) {
   let sum = 0;
-  for (const b of BLOCKS) sum += revealAt(b, n).boxes;
+  for (const b of allBlocks()) sum += revealAt(b, n).boxes;
   return sum;
 }
 
@@ -512,13 +546,17 @@ export function lyricEmphasis(n) {
  * @param {number} height 舞台高（CSS px）
  * @returns {number}
  */
-export function scrollWindowHeight(height) {
-  const h = height - FIXED_HEIGHT - COMPOSER_HEIGHT;
+export function scrollWindowHeight(height, opts = {}) {
+  // ⚠️ 固定区**只存在于引子**（§2.1）：帧 419 起它整条消失，滚动区因此长高 144px。
+  //    不把这件事算进来，419 那一帧（开词帧）的滚动位置就会算错 —— 而它恰好在段边界上。
+  const fixed = opts.prelude === false ? 0 : FIXED_HEIGHT;
+  const h = height - fixed - COMPOSER_HEIGHT;
   if (h < LINE_H * 4) {
     throw new Error(
-      `intro: 舞台高 ${height}px 减去固定区 ${FIXED_HEIGHT}px 与输入框 ${COMPOSER_HEIGHT}px 之后` +
+      `intro: 舞台高 ${height}px 减去固定区 ${fixed}px 与输入框 ${COMPOSER_HEIGHT}px 之后` +
         `只剩 ${h}px —— 滚动区放不下 4 行。\n` +
-        `  hint: 视口高要 > ${FIXED_HEIGHT + COMPOSER_HEIGHT + LINE_H * 4}px；引子的目标矩形是 960×640`,
+        `  hint: 舞台高要 > ${fixed + COMPOSER_HEIGHT + LINE_H * 4}px；` +
+        `舞台高就是画布高 H=${H}（左格 1152×1080，见 engine/layout.js）`,
     );
   }
   return h;
@@ -534,12 +572,12 @@ export function scrollWindowHeight(height) {
  * 这个值**恰好就是** `maxScroll`（`scrollHeight − clientHeight`）。
  * `film/test/pages.test.js` 里有一条测试对**全片 4741 帧**验证 `want ≤ maxScroll`。
  * @param {number} n 帧号
- * @param {{height?: number}} [opts] `height` = 舞台高（CSS px），默认 640
+ * @param {{height?: number}} [opts] `height` = 舞台高（CSS px），默认画布高 `H`
  * @returns {number} 滚动位置（CSS px）
  */
 export function scrollAtFrame(n, opts = {}) {
-  const height = opts.height ?? 640;
-  const win = scrollWindowHeight(height);
+  const height = opts.height ?? H;
+  const win = scrollWindowHeight(height, { prelude: n < ACT1.start });
   const content = contentHeight(n);
   return Math.max(0, content - win);
 }
@@ -553,10 +591,15 @@ export function scrollAtFrame(n, opts = {}) {
  * @returns {number}
  */
 export function contentHeight(n) {
-  const revealed = revealedLines(n);
-  const think = BLOCKS.find((b) => b.key === 'thinking');
-  const thinkShown = think ? revealAt(think, n).boxes : 0;
-  return revealed * LINE_H + (thinkShown > 0 ? THINK_HEAD_LINES * LINE_H + THINK_BODY_PAD : 0);
+  let boxes = 0;
+  let heads = 0;
+  for (const b of allBlocks()) {
+    const r = revealAt(b, n);
+    boxes += r.boxes;
+    // 每个**思维链块**都自带一格表头 + 8px 上下内边距（引子一块、第一幕一块）
+    if (b.thinkBody && r.boxes > 0) heads++;
+  }
+  return boxes * LINE_H + heads * (THINK_HEAD_LINES * LINE_H + THINK_BODY_PAD);
 }
 
 /**

@@ -37,8 +37,18 @@ import {
   stats,
   stddev,
 } from '../kit/raster.js';
-import { cellMetrics, drawText, glyphAtlas, registerFont, resolveFontFile } from '../kit/text.js';
+import { cellMetrics, drawText, drawTextDirect, glyphAtlas, registerFont, resolveFontFile } from '../kit/text.js';
 import { contains, describe, eq, ok, test, throws } from './_harness.js';
+
+/**
+ * 数一张图里**有 alpha 的像素个数**（墨迹面积）。 `drawText` 的源矩形写错时，这个数会明显偏小。
+ * @param {import('../kit/pixels.js').RawImage} img
+ */
+function countInk(img) {
+  let n = 0;
+  for (let i = 3; i < img.data.length; i += 4) if (img.data[i] > 0) n++;
+  return n;
+}
 
 /**
  * 造一张已知图：每个像素的 RGBA 由坐标算出来，**手算期望值**时不依赖被测代码。
@@ -616,6 +626,51 @@ describe('kit/text · 字形图集', () => {
       '缺字形且要求抛错',
     );
     contains(err.message, 'Z', '要说清是哪个字形');
+  });
+
+  test('⛔ 图集画的字必须和 fillText 画的一样（源矩形踩过一次坑）', () => {
+    // 2026-10-01 实测到的真 bug：`drawText` 把**整个字格**当源矩形、塞进**墨迹框**当目标，
+    // 于是每个字都被缩放着压扁成碎片（10×18 → 约 5×7）。
+    // 症状很会骗人：看起来像"字体没抗锯齿 / 被二值化了"，其实是几何错了 ——
+    // 人眼在成片里只是觉得"字有点脏"，机器如果不比就永远发现不了。
+    // 判据用**墨迹外接框 + 墨迹像素数**两条：缩放会把两者同时改小。
+    const font = tryFont();
+    if (!font) return;
+    const chars = 'mWell0';
+    const atlas = glyphAtlas(font, chars);
+    for (const ch of chars) {
+      const viaAtlas = createLayer(40, 32);
+      drawText(viaAtlas, atlas, { x: 8, y: 6 }, ch, { color: '#ffffff' });
+      const viaFill = createLayer(40, 32);
+      ctx2d(viaFill).fillStyle = '#ffffff';
+      drawTextDirect(viaFill, font, 8, 6 + atlas.ascent, ch, { color: '#ffffff' });
+
+      const ia = readRaw(viaAtlas);
+      const ib = readRaw(viaFill);
+      const ba = bbox(ia);
+      const bb = bbox(ib);
+      ok(ba && bb, `「${ch}」两条路径都该有墨迹`);
+      const inkA = countInk(ia);
+      const inkB = countInk(ib);
+      ok(
+        inkA >= inkB * 0.75,
+        `「${ch}」图集路径的墨迹只有 fillText 的 ${((inkA / inkB) * 100).toFixed(0)}%` +
+          `（${inkA} vs ${inkB}）—— 源矩形写错了？`,
+      );
+      // ⚠️ 判据是 **±1 像素**，不是"完全相同"：图集路径把墨迹位置**量化到整数格**
+      //    （bbox() 给的就是整数），这正是它"冻结渲染结果 + 快一个量级"的代价，也是设计。
+      //    要抓的是**缩放压扁**那个量级的错（整格 10×18 塞进墨迹框 5×7），±1 那种它抓不到也不该抓。
+      for (const [k, label] of [
+        ['x0', '左缘'],
+        ['x1', '右缘'],
+        ['y0', '上缘'],
+        ['y1', '下缘'],
+      ]) {
+        if (Math.abs(ba[k] - bb[k]) > 1) {
+          ok(false, `「${ch}」墨迹${label}差太多：图集 ${ba[k]} vs fillText ${bb[k]}（>1px 说明源矩形错了）`);
+        }
+      }
+    }
   });
 
   test('drawText 同一串画两次，结果逐像素一致', () => {

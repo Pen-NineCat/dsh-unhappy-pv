@@ -1,12 +1,12 @@
 /**
- * film/pages/dsh-composer.js — R1 的**输入框**（`design-options.md` §4.21/§4.22 的舞台）。
+ * film/pages/dsh-composer.js — R1 的**输入框**（画面规格 §2.1 的渲染分工 + §2.3 的幕间舞台）。
  *
  * ## 为什么引子里就要它（作者 2026-10-01 定：选 B）
  *
- * §1.6 把"整块 dsh UI"枚举成「固定区、滚动文档、对话、输出、思维链」，**没提输入框**，
+ * §2.1 把"整块 dsh UI"枚举成「固定区、滚动文档、对话、输出、思维链」，**没提输入框**，
  * 所以我第一版省掉了它（记录 25）。作者看了动态检查后选了 **B：加输入框、不加侧栏**。
- * 理由不止"像"：**§4.21/§4.22 的幕间整段建立在"她发一条文本 → 拿到和插件一样的错误 → `disable`"之上**，
- * 痕迹表第 1 条也是「输入框里还没删的字，**第一幕开头起（00:17）**」——
+ * 理由不止"像"：**§2.3 的幕间整段建立在"她发一条文本 → 拿到和插件一样的错误 → `disable`"之上**，
+ * §2.2 的 `D3` 也是「输入框里逐字出现「我这边下雨了」，随后被逐字退格删掉」——
  * 那条通道迟早要出现，早一点建好、早一点能在成片里对齐。
  *
  * ## 类名与结构是**量出来的**，不是猜的
@@ -29,35 +29,33 @@
  * 图标（`+`、发送箭头、模型图标）**不在任何 CSS 里**（来自 dsh 的图标注册表），
  * 所以按钮里放的是字符（`+` / `↑`）—— 与思维链表头用 `▾` 同一个处理。
  *
- * ## 语言：**英文**
+ * ## 语言：**中文**（dsh 自己的 UI 文案是中文，§1.1）
  *
- * 真界面在这台机器上是 zh locale（placeholder 是「描述你想要构建的内容…」，
- * 权限是「完全权限」）。但 §0 的硬约束是「**机器文本一律英文**」，
- * 而 §4.22 更狠：「**全片唯一的中文句子是人打的**（`你还好吗`）」——
- * 往输入框里放中国字，观众会以为那是**她**写的。
- * 所以这里的文案是英文，**全部集中在 `COMPOSER_TEXT` 一处**，要改只改那一处。
+ * 这台机器上真界面就是 zh locale（placeholder「描述你想要构建的内容…」、权限「完全权限」）。
+ * 所以这里的文案 = **实测到的那几串**，集中在 `COMPOSER_TEXT` 一处。
+ * ⚠️ 旧口径（记录 26）是"机器文本一律英文"，那是按当时的 §0 写的；§1.1 已经把它反过来，
+ * 而 §2.3 还专门纠正过：「（**不是**"全片唯一的中文句子是人打的"——dsh 的 UI 文案本来就是中文）」。
+ * 唯一不是中文的是 `model`（`DeepSeek-V41-Flash High` 是**模型目录里的 real id 名**，本来就英文）。
  */
 
 /**
  * 输入框里的产品文案。**唯一一处**。
  *
- * ## 语言：`placeholder` 中文、`permission` 英文 —— 这是按新版规格来的，有出处
+ * ## `permission`：取「**完全权限**」（作者 2026-10-01 拍板，A1）
  *
- * `design-options.md`（2026-10-01 重构版）§1.1 的语言分工是：
- * **dsh 的 UI 文案是中文**（`深度求索中` / `工具已更新` / `思考`）；**模型产出的内容是英文**；
- * **人的文字是中文**。§2.3 还专门纠正了旧口径：
- * 「（**不是**"全片唯一的中文句子是人打的"——dsh 的 UI 文案本来就是中文）」
- * → 所以 `placeholder` 用**真界面实测到的那串中文**，不再是我按旧口径译的英文。
+ * 上一轮这里取的是英文 `Full access`，理由是 §2.2/§3 把它当成**语义对**引用：
+ * 🎯「两个权限词配成一对：`Full access`（**她**开的门）／`403`（**他**关的窗）」，
+ * §2.4 又说「`Full access` 是崩坏的语义前提」。但真界面在这台机器上显示的是「**完全权限**」，
+ * 而 §1.1 的硬约束是"**dsh 的 UI 文案是中文**"。
  *
- * ⚠️ 但 `permission` 是**例外**：§2.2 与 §3 把它当作**必须真实的 dsh 字符串**引用
- * （🎯「两个权限词配成一对：`Full access`（她开的门）／`403`（他关的窗）」，
- * §2.4 又说「`Full access` 是崩坏的语义前提」）。真界面在这台机器上显示的是「完全权限」，
- * 两处**不一致** —— 我按"被当成语义对的那一个"取 `Full access`，并**已报给作者**。
- * 要改成「完全权限」就改这一行（`film/test/pages.test.js` 里没有对着它写死断言）。
+ * 作者拍板：**用真界面实显的那串**「完全权限」。所以：
+ * - 这一行不再是我"按语义对猜的英文"，而是**实测到的产品文案**；
+ * - ⚠️ 由此 §2.2/§2.4 里写作 `Full access` 的那几处**与片子不一致**了 ——
+ *   那两处的语义（"她开的门"、"崩坏的前提"）不受影响，但**字面要改**（已报作者）。
  */
 export const COMPOSER_TEXT = {
   placeholder: '描述你想要构建的内容, / 调用指令, @ 文件或对话',
-  permission: 'Full access',
+  permission: '完全权限',
   model: 'DeepSeek-V41-Flash High',
   add: '+',
   send: '↑',
@@ -68,19 +66,33 @@ export const COMPOSER_TEXT = {
  *
  * 结构照实测那一棵；**不加 `uV2eYG_hero`** —— 我们的会话是有内容的（不是空会话的首屏），
  * 那个类会把输入区 min-height 从 36 顶到 52、placeholder 变成居中两行。
- * @param {{text?: typeof COMPOSER_TEXT}} [o]
+ *
+ * ## `input`：她打的字（画面规格 §2.2 / §三）
+ *
+ * 引子里 `input` 永远是空串（输入框空着 = "她在，但没说话"，O1 的载体之一）；
+ * 第一幕 `[419, 484)` 她**打了字又删掉**（`act1.inputTextAt(n)`），之后又是空的。
+ * 有字的时候**不画 placeholder**（真界面也是这个行为）。
+ *
+ * ## `caret`：焦点在她身上时才有文字光标，而且**会闪**（§三「焦点」）
+ *
+ * 亮不亮由 `act1.inputCaretOn(n)` 算（纯 `n` 的方波，见 `caret.js`）。
+ * ⚠️ 光标是**伪元素**（`::after`），所以它不进 HTML 的文本、也不会被复制；
+ * 这里只挂一个 `data-caret` 属性，形状与尺寸钉死在 `body.js` 的 pageCss 里
+ * （2px × 1em —— 不钉死会被字形度量撑高，`▾` 那次就是这么翻的车）。
+ * @param {{text?: typeof COMPOSER_TEXT, input?: string, caret?: boolean}} [o]
  * @returns {string}
  */
 export function composerHtml(o = {}) {
   const t = o.text ?? COMPOSER_TEXT;
+  const input = o.input ?? '';
   return `
 <div class="uV2eYG_root" data-dsh-composer="true">
   <div class="uV2eYG_card" data-composer-card="true">
     <div class="uV2eYG_overlayAnchor"></div>
     <div class="uV2eYG_scroll" data-input-scroll="true">
       <div class="uV2eYG_grow">
-        <div class="uV2eYG_input" data-composer-input="true"></div>
-        <div class="uV2eYG_placeholder" data-composer-placeholder="true">${esc(t.placeholder)}</div>
+        <div class="uV2eYG_input" data-composer-input="true" data-input-len="${input.length}"${o.caret ? ' data-caret="1"' : ''}>${esc(input)}</div>
+        ${input ? '' : `<div class="uV2eYG_placeholder" data-composer-placeholder="true">${esc(t.placeholder)}</div>`}
       </div>
     </div>
     <div class="uV2eYG_row">

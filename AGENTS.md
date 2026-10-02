@@ -2,18 +2,20 @@
 
 > 给在本仓库里干活的 AI 代理（以及未来的协作者）的约定。
 > 面向人的介绍在 [README.md](README.md)。
-> 本地（`PersonalWorkaround/`，不提交）的三份长文，各有分工：
+> 三份长文各有分工——两份在 `PersonalWorkaround/`（本地，不提交），一份就在仓库根：
 > - `dsh-wme-pv-review.md` —— 参考项目复盘 + 通用技术路线。
 > - `dsh-wme-pv-node-migration.md` —— **施工说明**：选型、接口契约、分阶段计划、风险、禁止清单、施工记录（附录 C）。
-> - `design-options.md` —— **画面规格**：现行结论、任务清单（T0–T9）、验收标准、**⛔ 待拍板项**、按时间轴的现行设计。
+> - **[`design-options.md`](design-options.md)** —— **画面规格**（**在仓库根、随代码提交**，它就是给管线 Agent 的施工输入）：
+>   现行结论、任务清单（T0–T10）、验收标准、**⛔ 待拍板项**、取材清单、按时间轴的现行设计。
 >
 > 冲突时：**本文档管纪律与素材事实**；施工说明管工具链与接口细节；画面规格管画面。三者的临时豁免（施工说明 §0.1）已随本轮回填失效。
 
 **标记约定**：`🚧` = **未定 / 未实现 / 条目不完整**。带这个标记的内容只是占位与方向，**不要当成依据**。
 目前 🚧 的条目：
-- **画面内容大部分未实现** —— 引子的**网页层**已实现（`film/pages/intro.js`），**图形侧**登记的还是管线自检画面（`content/example.js`）；
-- **画面规格里的 ⛔ 待拍板项**（第二幕、结尾、层的长相、第一次 `love me`、一个 LRC 时间戳的真值等）—— 见画面规格 §1.4，**不要自行决定**；
-- **歌词方案**（要不要逐词时间轴、用哪个版本），`data/timing/` 未落地。
+- **画面只做到第一幕** —— 引子 `[0,419)` 与第一幕 `[419,1903)` 有画布侧实现（`content/prelude.js`、`content/act1.js`）；**幕间与第二幕仍登记管线自检画面**（`content/example.js`）；
+- **`design-options.md` §1.4 的 ⛔ 表**（LRC 时间戳真值、第一次 `love me` 的画面、层的"外观"、FFN/LayerNorm 视觉、两格读数行的退化方式、崩坏那条 `Warning:` 的文案、第二幕与结尾未设计）—— **不要自行决定**；
+  ✅ 规格已写明：**T4–T10（版面 + 第一幕 + 幕间）现在零 ⛔ 阻塞**，可以开工；
+- **歌词方案**（要不要逐词时间轴、用哪个版本），`data/timing/` 未落地（`data/cursor/` 的关键点表已有）。
 
 已定并写进本文档的：**24 fps、1920×1080 原生、4741 帧**；**纯 Node 工具链**；`film/engine/clock.js` 是常量唯一来源。
 
@@ -26,16 +28,16 @@
 
 | | 状态 |
 |---|---|
-| **出片管线** | ✅ **完成**。Phase 0–7 全部落地；`node film/check.js` 退出 0、`node film/test/run.js` **209/209**、`node film/guard.js` **14/14**（三条 ⭐ 全过，1 条 ⚠️ 需人眼） |
-| **画面内容** | 🔸 **部分**。引子的**网页层已实现**（`film/pages/intro.js`，`body.js` 默认变体 `intro`；帧 0–419 已渲到 `out/prelude/`）。**图形侧仍登记管线自检**：`film/engine/content.js`（内容的唯一注册点）四段都指向 `content/example.js` —— 引子的画布部分与第一幕之后**未写** |
-| 网页层的路线 | 已拍板 **R1**（vendored CSS + 自建 DOM + 自己的令牌），且**引子这一块已实现**（`film/pages/intro.js`）；其余段落待做 |
+| **出片管线** | ✅ **完成**。Phase 0–7 全部落地；`node film/check.js` 退出 0、`node film/test/run.js` **249/249**、`node film/guard.js` **14/14**（三条 ⭐ 全过，1 条 ⚠️ 需人眼） |
+| **画面内容** | 🔸 **做到第一幕**。`content.js`（内容的唯一注册点）现在登记：引子 → `drawPrelude`、第一幕 → `drawAct1`、**幕间与第二幕 → `drawExample`（管线自检）**。网页层：引子页 `film/pages/intro.js`、第一幕页 `film/pages/act1.js` |
+| 网页层的路线 | **R1**（vendored CSS + 自建 DOM + 自己的令牌）。三格分工按规格**暂定「只有左格走浏览器」**（规格 §2.2）；引子与第一幕这一块已实现，其余待做 |
 | 诚实边界 | `--full`（4741 帧整片）**没跑过**；**跨机器确定性没有验证**；`out/frames.sha256` 还没生成过；没有任何 PV 画面的视觉验收 |
 
 ## 2. 硬规则（不要违反）
 
 1. **音频原件永远不进仓库。** 仓库只存 sha256（`Resource/song.json`）：原曲一个、母版一个，两步校验见 §3。
    `.gitignore` 里有 `*.mp3`/`*.wav`/`*.flac`/`*.m4a` 保险丝，确需提交音频得先说明理由。
-2. **`PersonalWorkaround/` 整个目录都不提交。** 参考项目完整副本、mp3 原件、复盘 / 施工说明 / 画面规格都在里面。
+2. **`PersonalWorkaround/` 整个目录都不提交。** 参考项目完整副本、mp3 原件、复盘与施工说明都在里面。
    其中的 `world-execute-me-dsh-pv/` **自带 `.git`** —— 只读参考，不要改它的任何文件，也不要把它 `git add` 进来。
 3. **`Resource/` 只放指纹与说明**，不放音频、视频、图片原件。
 4. **不要 `git add -A` / `git add .`。** 显式列文件；提交前 `git status` 必须是干净的（`film/guard.js` 的「仓库卫生」一条会自动查）。
@@ -79,10 +81,11 @@
 
 | 路径 | 内容 |
 |---|---|
+| [`design-options.md`](design-options.md) | **画面规格**（仓库根，提交）：T0–T10 任务清单、验收标准、⛔ 项、取材清单、按时间轴的现行设计 |
 | `film/kit/` | 图形原语：`canvas.js`（画布/图层/合成算子）、`raster.js`（LUT、通道、box 降采样、可分离高斯、Sobel）、`text.js`（字形图集与排版）、`color.js`、`noise.js`、`pixels.js`（像素/字节边界的**唯一**转换点）、`post.js` + `post-config.js` |
-| `film/engine/` | `clock.js`（`FPS`/`W`/`H`/`END_T` **唯一来源**）、`timeline.js`（段表 + `finalize` 断言）、`layers.js`（六层顺序，写成数据）、**`content.js`（内容的唯一注册点）**、`frame.js`（单帧入口）、`camera.js`、`transitions.js` |
-| `film/content/` | **图形侧**场景。现在只有 `example.js` = 管线自检画面；**引子的画布部分未写** |
-| `film/pages/` | 网页层：**`intro.js`（引子的真页面，帧 0–419）**、`body.js`（`body(t) -> HTML`，`intro` / `probe` 两个变体）、`gen-frames.js`（→ `frames.json` + 舞台 HTML）、`shot.mjs`（Playwright 截图器 + `--smoke`/`--jitter-check`/`--scroll-check`）、`preview.mjs`（全览表 / 预览片 / 逐帧变化表）、`extract-css.mjs`（抽 CSS → `vendor/dsh-css/`）、`stage-html.js`、`dsh-blocks.js`、`dsh-theme.js`、`dsh-composer.js`、`probe.js`、`theme-probe.js` |
+| `film/engine/` | `clock.js`（`FPS`/`W`/`H`/`END_T` **唯一来源**）、`layout.js`（**版面几何的唯一来源**）、`timeline.js`（段表 + `finalize` 断言）、`layers.js`（六层顺序，写成数据）、**`content.js`（内容的唯一注册点）**、`frame.js`（单帧入口）、`cursor.js`（她的鼠标路径）、`camera.js`、`transitions.js` |
+| `film/content/` | **图形侧**场景：`prelude.js`、`act1.js`、`panels.js`、`cursor.js`、`memory.js`；`example.js` = 管线自检画面（**幕间与第二幕仍用它**） |
+| `film/pages/` | 网页层：`intro.js`（引子真页面）、`act1.js`（第一幕页面）、`caret.js`（光标方波）、`body.js`（`body(t) -> HTML`，`intro` / `probe` 变体）、`gen-frames.js`（→ `frames.json` + 舞台 HTML）、`shot.mjs`（Playwright 截图器 + `--smoke`/`--jitter-check`/`--scroll-check`）、`preview.mjs`（全览表 / 预览片 / 逐帧变化表）、`extract-css.mjs`（抽 CSS → `vendor/dsh-css/`）、`stage-html.js`、`dsh-blocks.js`、`dsh-theme.js`、`dsh-composer.js`、`probe.js`、`theme-probe.js` |
 | `film/compose/` | `overlay.js`（截图当图层）、`lead.js`（主导权淡化）、`shots.js`（缺帧**报错**）、`track-layer.js`（轨道层注入，显式接口） |
 | `film/lib/` | `ffmpeg-path.js`（三级路径解析）、`frame-segments.js`（连续段切分）、`render-worker.js`、`static-server.js`、`dsh-web.js` |
 | `film/{check,guard,hash,render,render-video}.js` | 自检、全量护栏、帧哈希清单、单帧渲染、分段渲染 + 编码 |
@@ -90,8 +93,8 @@
 | `film/vendor/` | dsh 素材：`dsh-web-frontend`、`dsh-client-ui-theme`、`dsh-client-ui-cordis` 三个 MIT 包副本 + 抽出的 `dsh-css/`（**页面实际吃的是它**）。怎么来的、怎么更新、许可，见 `film/vendor/README.md` |
 | `tools/` | `trim-song.mjs`（Node）、`trim-song-parity.mjs`（对拍）、`trim_song.py`（**过渡件**，等作者拍板删除）、`lyrict/`（vendored，**当前不可运行**：Python 包，本仓库已移除 Python 环境） |
 | `package.json` | ESM（`"type": "module"`）、`engines.node >= 20`；`dependencies` 只有 `@napi-rs/canvas`（精确锁），`devDependencies` 只有 `playwright`（精确锁）；scripts 见 §5 |
-| `Resource/`、`input/`、`out/`、`data/` | 指纹 / 本机输入（忽略） / 产物（忽略） / `data/timing/` **未落地**（🚧） |
-| `PersonalWorkaround/` | 个人工作区（忽略）：参考项目副本、音频原件、复盘 / 施工说明 / 画面规格 |
+| `Resource/`、`input/`、`out/`、`data/` | 指纹 / 本机输入（忽略） / 产物（忽略） / `data/cursor/keypoints.json`（鼠标路径的关键点表）；`data/timing/` **未落地**（🚧） |
+| `PersonalWorkaround/` | 个人工作区（忽略）：参考项目副本、音频原件、复盘 / 施工说明 |
 
 目录名一旦定下就**不要改名**。
 
@@ -135,12 +138,16 @@ node film/test/perf-baseline.js            # 后期/算子性能基线
 python tools/trim_song.py check --src input/song.mp3 --master input/song.master.mp3   # 过渡期
 ```
 
-**画面硬约束（来自本地画面规格 §1.1，写代码时必须遵守）**：
+**画面硬约束（来自 [`design-options.md`](design-options.md) §1.1，写代码时必须遵守）**：
 
-- 全片**无声**（只有歌声本身）→ 一帧硬切就是最大音量；同一时刻**在场通道 ≤ 3**。
-- **语言分工**：dsh 的 UI 文案是**中文**；模型产出的内容是**英文**；人的文字是**中文**。
+- 全片**无声**（只有歌声本身）→ 一帧硬切就是最大音量。
+- **在场通道 ≤ 3**，而「通道」= **需要观众同时跟踪的独立信息流**（不是"画面上有几样东西"）：三格版面算 3 条。
+  ⚠️ 规格给崩坏那一拍写了**一条显式例外**（居中的 `Warning:` 不与任何栏对齐，是第 4 条，**只此一次**）。
+- **语言分工**：dsh 的 UI 文案是**中文**、模型产出的内容是**英文**、人的文字是**中文**；dsh 的中文字符串**从规格 §三 的取材清单取**，不要自己编。
+- **鼠标路径由脚本生成**（`data/cursor/keypoints.json` + `film/engine/cursor.js`），**不录制**；键盘事件同样写死。
+- **层索引表（`L1`–`L5`）只服务内部一致**，画面上**不出现任何层编号**。
 - 遇到「整块 / 全部 / 等」这类模糊限定词**先问再动**；涉及「清屏 / 清除 / 重置」**先确认作用域**。
-- 🚧 的画面项（画面规格 §1.4 的 ⛔ 表）**不要自行决定**。
+- 🚧 的画面项（规格 §1.4 的 ⛔ 表）**不要自行决定**；规格正文里出现**查不到的编号**（旧选项代号）就是文档错误，**报出来**。
 
 ## 6. 本机环境现状（2026-10-01 实测）
 
@@ -153,7 +160,7 @@ python tools/trim_song.py check --src input/song.mp3 --master input/song.master.
 | Playwright 浏览器 | 已就绪（`%LOCALAPPDATA%\ms-playwright`）：`chromium-1243`、`chromium_headless_shell-1243`、`ffmpeg-1011`、`winldd-1007` |
 | ffmpeg / ffprobe | 装在 **`E:\ffmpeg\bin`**（`ffprobe N-127021-ge0c94b2d1c-20260930`），已在**用户级 PATH**；**但已运行的 dsh 进程不继承它** —— agent 的 shell 里直接敲 `ffmpeg` 是 CommandNotFound。代码里走 `film/lib/ffmpeg-path.js` 的三级解析（环境变量 → 已知绝对路径 → PATH），`film/check.js` 会打印实际路径 |
 | Python（残留） | 只有 `C:\Python314\python.exe`，**只够跑纯标准库脚本**（`tools/trim_song.py`、`trim-song-parity.mjs` 里的对拍）。`tools/lyrict/` 与参考项目的渲染代码**当前跑不了** |
-| 测量值 | `check` 退出 0；`test` **209/209**；`guard` **14/14**（1 条 ⚠️ 需人眼：边界帧出图）；`out/frames.sha256` **未生成**（跑 `render-video.js --manifest`） |
+| 测量值 | `check` 退出 0；`test` **249/249**；`guard` **14/14**（1 条 ⚠️ 需人眼：边界帧出图）；`out/frames.sha256` **未生成**（跑 `render-video.js --manifest`） |
 | 参考项目工作副本 | `PersonalWorkaround/world-execute-me-dsh-pv/`（自带 `.git`，勿动） |
 
 ## 7. 代码约定
@@ -211,7 +218,8 @@ python tools/trim_song.py check --src input/song.mp3 --master input/song.master.
 
 **尚未做的事如实说**：不写「已验证音画同步」「已保证确定性」这种话。
 `--full` 的 4741 帧整片**没跑过**（快档只渲 48 帧）；确定性只在**同机、跨进程、跨 worker 数**下验证过，**跨机器没有验证**
-（Skia 在不同 CPU 上可能走不同 SIMD 路径）；目前**没有任何 PV 画面的视觉验收** —— 引子的网页层已经能渲出 419 帧，但图形侧登记的仍是管线自检画面。
+（Skia 在不同 CPU 上可能走不同 SIMD 路径）；目前**没有任何 PV 画面的视觉验收** —— 画面只做到第一幕（`prelude` + `act1`），幕间与第二幕仍是管线自检画面。
+规格 §1.2 的**五条自动断言**（输入框状态、`hmm`/`maybe` 预算、token 层索引、半行残留、鼠标落点）属于**内容层**护栏，跨段的那几条要等合并成整幕后才能验，它们**不在 `film/guard.js` 里**。
 
 ## 9. 许可与署名
 
@@ -229,7 +237,6 @@ python tools/trim_song.py check --src input/song.mp3 --master input/song.master.
 
 - 改了行为就同时改 `README.md`（面向人）与这份 `AGENTS.md`（面向代理）；两者冲突时**以 `AGENTS.md` 为准**。
 - 未定的条目一律加 `🚧`；定下来之后**同时**去掉标记并写清结论。**定了但没实现**的，要写清"已定、未实现"。
-- `PersonalWorkaround/` 的三份长文不是仓库文档，引用时写清「本地文件，不提交」：
-  施工说明是**工具链与阶段计划**的来源（它的附录 C 是施工记录，每完成一步就回填）；
-  画面规格是**画面**的来源（现行结论 + ⛔ 待拍板项）。
+- 引用时写清哪份在哪：**[`design-options.md`](design-options.md) 在仓库根、随代码提交**（画面规格：现行结论 + T0–T10 任务清单 + ⛔ 项 + 取材清单）；
+  `PersonalWorkaround/` 里的两份（参考项目复盘、施工说明）是**本地文件，不提交**，施工说明的附录 C 是施工记录、每完成一步就回填。
 - 素材事实（§3）与常量（`clock.js`）改动后，要同步 `Resource/song.json` 与两处正文里的数字。

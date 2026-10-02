@@ -12,11 +12,16 @@
  * 3. **网格契约**：每行 ≤ 字符预算、固定区恰好 5 行、类名是从真 CSS 解析出来的。
  */
 
-import { END_T, FPS, FRAME_COUNT, timeAt } from '../engine/clock.js';
+import { END_T, FPS, FRAME_COUNT, H, timeAt } from '../engine/clock.js';
 import { PRELUDE_MARKS } from '../engine/content.js';
+import { CELL_TITLE } from '../engine/layout.js';
 import { VARIANTS, body, beatAt, pageCss, scrollAtFrame } from '../pages/body.js';
 import * as intro from '../pages/intro.js';
-import { COMPOSER_TEXT } from '../pages/dsh-composer.js';
+import { COMPOSER_TEXT, composerCss, composerHtml } from '../pages/dsh-composer.js';
+import { caretStats } from '../pages/caret.js';
+import { TITLE_CHARS as PANELS_TITLE_CHARS } from '../content/panels.js';
+import * as act1 from '../pages/act1.js';
+import { probeBody, probeCss } from '../pages/probe.js';
 import { markdownRootClass, VENDOR_MOUNT, assertThemeAssets } from '../pages/dsh-theme.js';
 import { STAGE_HTML } from '../pages/stage-html.js';
 import { hashString } from '../pages/gen-frames.js';
@@ -46,11 +51,16 @@ describe('Phase 5 · body(n) 必须是纯函数', () => {
     ok(hashes.size > 8, `采样帧的正文指纹只有 ${hashes.size} 种 —— 页面几乎是静态的`);
   });
 
-  test('引子结束（帧 419）之后正文**冻结**：419..4740 逐字符相同', () => {
-    // 这是设计上要的（引子只到 419，之后的画面另有其人负责），
-    // 顺带也是焊点 4 第一次拿到真正的用武之地：4000 多帧共用同一个 DOM。
-    const frozen = body(419);
-    for (const n of [420, 500, 1000, 2366, 4740]) eq(body(n), frozen, `body(${n}) 该与 419 相同`);
+  test('引子结束（帧 419）之后**第一幕接上**（不再是冻结状态）', () => {
+    // ⚠️ 这条断言在 T5 之前写的是"419 之后逐字符冻结"（那时引子后面还没内容）。
+    //    第一幕落地后它不再成立 —— 页面是**同一份对话文档**，419 之后继续往下长（§2.2）。
+    ok(body(419) !== body(1000), '第一幕的正文不该与 419 相同');
+    // 但**第一幕最后一个事件之后页面又冻住了** —— 因为第二幕的页面内容还没设计。
+    // 如实断言它，免得把"没有内容"当成"在动"。
+    eq(body(802), body(4740), '第一幕之后页面冻结（第二幕的网页层未设计）');
+    // 但引子的内容**一个字都没少**（只往里加，不往回改）
+    const cnt = (/** @type {string} */ h) => (h.match(/class="stage__line/g) ?? []).length;
+    ok(cnt(body(1000)) >= cnt(body(419)), '行数只增不减');
   });
 
   test('非整数帧号直接报错', () => {
@@ -151,17 +161,21 @@ describe('Phase 5 · 引子的三拍与算术', () => {
       ok(r >= prev, `帧 ${n} 的已显示行数 ${r} < 上一帧 ${prev}`);
       prev = r;
     }
-    eq(prev, intro.TOTAL_LINES, '末帧该全部显示完');
+    eq(prev, intro.allBlocks().reduce((s, b) => s + b.lines.length, 0), '末帧该把**全部块**的行都显示完');
   });
 
   test('⛳ 滚动位置对**全片 4741 帧**都够得着（want ≤ maxScroll，永远不会被浏览器夹住）', () => {
     // 这是「滚动位置 = f(t)」能不能成立的全部：设了 scrollTop 但内容不够高时，
     // 浏览器会静默地把它夹到 maxScroll —— 画面静止，且**没有任何报错**。
-    const height = 640;
-    const win = intro.scrollWindowHeight(height);
+    // 舞台高 = 画布高 H（§2.1 U3 之后引子页就是按目标矩形渲的：满屏 1920×1080 → 左格 1152×1080）
+    const height = H;
+    // ⚠️ 窗口高**逐帧**不同：固定区只在引子里（§2.1），419 起它消失、窗口长高 144px。
+    //    这里必须按同一规则算，否则 419 那一帧会被误判成"被夹住"（实测踩到过）。
+    const winOf = (/** @type {number} */ n) =>
+      intro.scrollWindowHeight(height, { prelude: n < intro.MARKS.firstLyric });
     for (let n = 0; n < FRAME_COUNT; n++) {
       const content = intro.contentHeight(n);
-      const maxScroll = Math.max(0, content - win);
+      const maxScroll = Math.max(0, content - winOf(n));
       const want = intro.scrollAtFrame(n, { height });
       ok(want <= maxScroll, `帧 ${n}: want=${want} > maxScroll=${maxScroll}`);
       ok(want >= 0, `帧 ${n}: want=${want} 是负数`);
@@ -170,9 +184,15 @@ describe('Phase 5 · 引子的三拍与算术', () => {
   });
 
   test('滚动位置随帧推进（否则滚动区是个静态块）', () => {
-    ok(intro.scrollAtFrame(0, { height: 640 }) < intro.scrollAtFrame(143, { height: 640 }), '拍 1 内该推进');
-    ok(intro.scrollAtFrame(143, { height: 640 }) < intro.scrollAtFrame(418, { height: 640 }), '跨拍该继续推进');
-    eq(scrollAtFrame(419), scrollAtFrame(4740), '引子之后该冻住');
+    ok(intro.scrollAtFrame(0, { height: H }) < intro.scrollAtFrame(143, { height: H }), '拍 1 内该推进');
+    ok(intro.scrollAtFrame(143, { height: H }) < intro.scrollAtFrame(418, { height: H }), '跨拍该继续推进');
+    // ⚠️ 419 那一帧的滚动位置会**变小**：固定区消失、窗口长高 144px（底部仍然对齐内容底部）。
+    //    这不是回退 —— 内容高没变，只是窗口变高了。
+    ok(
+      intro.scrollAtFrame(419, { height: H }) < intro.scrollAtFrame(418, { height: H }),
+      '419 帧窗口长高，滚动位置应当减小',
+    );
+    ok(intro.scrollAtFrame(900, { height: H }) > intro.scrollAtFrame(419, { height: H }), '第一幕里继续往下走');
   });
 
   test('歌词「成形」窗口在拍 2 之内，且 1–2 秒（§1）', () => {
@@ -215,7 +235,7 @@ describe('Phase 5 · 滚动区域与固定区（`design-options.md` §1.6/§1.7�
 
   test('滚动位置写进了 data-scroll（截图器读它去设 scrollTop）', () => {
     for (const n of [0, 100, 419]) {
-      contains(body(n), `data-scroll="${intro.scrollAtFrame(n, { height: 640 })}"`, `帧 ${n} 的 data-scroll`);
+      contains(body(n), `data-scroll="${intro.scrollAtFrame(n, { height: H })}"`, `帧 ${n} 的 data-scroll`);
     }
   });
 
@@ -251,7 +271,7 @@ describe('Phase 5 · 滚动区域与固定区（`design-options.md` §1.6/§1.7�
     ok(compAt > 0, '要有输入框');
     ok(compAt > scrollAt, '输入框该在滚动容器之后（同样不进滚动区）');
     // 三个高度常数：舞台 = 固定区 + 滚动窗口 + 输入框
-    const h = 640;
+    const h = H;
     eq(
       intro.scrollWindowHeight(h),
       h - intro.FIXED_HEIGHT - intro.COMPOSER_HEIGHT,
@@ -284,7 +304,11 @@ describe('Phase 5 · 滚动区域与固定区（`design-options.md` §1.6/§1.7�
     contains(typing, 'data-caret="1"', '正在吐的那一行该挂光标');
     eq((typing.match(/data-caret="1"/g) ?? []).length, 1, '光标**只有一个**（挂在正在吐的那一行）');
     const done = body(419); // 吐完了
-    eq(done.includes('data-caret'), false, '吐完之后不该有光标');
+    // ⚠️ **两个光标是两件事，不要混**（A9 之后）：
+    //    ① 对话里"正在生成"那个 —— 419 吐完就没了；
+    //    ② 输入框里"她按住"那个 —— 419 她**开始打字**，正好在下一条测试里。
+    eq(/class="stage__line[^"]*"[^>]*data-caret/.test(done), false, '吐完之后对话里的光标不该有');
+    eq(/ZkiH0q_\w+[^>]*data-caret/.test(done), false, 'ContextBody 那一行的光标也不该有');
     contains(body(0), 'data-caret="1"', '帧 0 就在吐第一个字，该有光标');
   });
 
@@ -292,6 +316,228 @@ describe('Phase 5 · 滚动区域与固定区（`design-options.md` §1.6/§1.7�
     const html = body(200);
     eq(html.includes('<img'), false, '引子的 dsh 界面里没有位图资源');
     eq(body(0, { variant: 'probe' }).includes('./assets/probe-dot.svg'), true, '探针变体才有那张图');
+  });
+});
+
+describe('Phase 5 · 第一幕 T5（`[419, 802)`）', () => {
+  test('输入框：逐字出现 → 停 → 逐字删掉 → 空（判据「字逐字出现又消失」）', () => {
+    const w = act1.INPUT_WINDOW;
+    eq(act1.inputTextAt(w.typeStart - 1), '', '开始之前是空的');
+    eq(act1.inputTextAt(w.typeStart).length, 1, '第一帧只出 1 个字（逐字，不是整句蹦出来）');
+    eq(act1.inputTextAt(w.typeEnd), act1.INPUT_TEXT, '出完那一帧是整句');
+    eq(act1.inputTextAt(w.holdEnd), act1.INPUT_TEXT, '中间停着');
+    const mid = act1.inputTextAt(Math.round((w.deleteStart + w.deleteEnd) / 2)).length;
+    ok(mid > 0 && mid < act1.INPUT_TEXT.length, `删到一半该是半句，实测 ${mid} 字`);
+    eq(act1.inputTextAt(w.deleteEnd), '', '删完那一帧空');
+    eq(act1.inputTextAt(w.deleteEnd + 50), '', '此后一直空着（零实质性输入）');
+    for (let n = w.typeStart; n < w.typeEnd; n++) {
+      ok(act1.inputTextAt(n + 1).length >= act1.inputTextAt(n).length, `帧 ${n} 出现阶段该只增`);
+    }
+    for (let n = w.deleteStart; n < w.deleteEnd; n++) {
+      ok(act1.inputTextAt(n + 1).length <= act1.inputTextAt(n).length, `帧 ${n} 删除阶段该只减`);
+    }
+    eq(Math.round(20.114 * FPS), w.deleteEnd, '删完正好落在下一句开口那一帧（附录男声第 4 行）');
+  });
+
+  test('清空之后输入框回到空态：placeholder 回来、字数为 0', () => {
+    const withText = body(430);
+    // ⚠️ 字数**不要写死**：她打的那串字是文档给的（`我这边下雨了`），改字就改那一处常量。
+    //    写死过的版本在换字符串时会红成一片 —— 而那时真正要守的只是"有字时标出字数"。
+    contains(withText, `data-input-len="${act1.inputTextAt(430).length}"`, '有字的时候要标出字数');
+    ok(act1.inputTextAt(430).length > 0, '帧 430 该有字（不然这条断言是空的）');
+    eq(withText.includes('uV2eYG_placeholder'), false, '有字的时候不画 placeholder（真界面也是）');
+    const empty = body(600);
+    contains(empty, 'data-input-len="0"', '清空后字数是 0');
+    contains(empty, 'uV2eYG_placeholder', '空着时 placeholder 回来（= 她在，但没说话）');
+    contains(empty, COMPOSER_TEXT.placeholder, 'placeholder 仍是真界面那串');
+  });
+
+  test('D3：她打的是「我这边下雨了」——文档给的字符串，而且是**中文**（§1.1 人的文字是中文）', () => {
+    // §2.2 新版把 D3 写全了：「**输入框里逐字出现「我这边下雨了」，随后被逐字退格删掉**」。
+    // 上一轮我按三条线索猜成英文歌词（`Every day we talk a little less`）—— 那是错的，
+    // 而且错在两处：① 人的文字是中文；② 这段字**与歌词无关**才是重点。
+    eq(act1.INPUT_TEXT, '我这边下雨了', '字符串必须是文档给的那一个（要改先改 §2.2，再改这里）');
+    ok(/^[\u4e00-\u9fa5]+$/.test(act1.INPUT_TEXT), `「${act1.INPUT_TEXT}」该全是汉字（人的文字 = 中文）`);
+    ok(act1.INPUT_TEXT.length >= 4 && act1.INPUT_TEXT.length <= 12, `长度 ${act1.INPUT_TEXT.length} 该是"一句日常话"`);
+    // 「与歌词无关」：它不该出现在思维链/改写的任何一行里
+    for (const e of act1.EVENTS) {
+      eq(e.text.includes(act1.INPUT_TEXT), false, `她的日常话不该是思维链里的「${e.text}」`);
+    }
+  });
+
+  test('D3：整句在框里停得住（文档要求"必须读得出来（1 秒左右）"）', () => {
+    const w = act1.INPUT_WINDOW;
+    const holdSec = (w.holdEnd - w.typeEnd) / FPS; // 整句可见的时长
+    ok(holdSec >= 0.7 && holdSec <= 1.3, `整句可见 ${holdSec.toFixed(2)}s —— 文档要的是"1 秒左右"`);
+    eq(w.typeStart, act1.ACT1.start, '出现的起点 = 开词帧 419');
+    eq(w.typeEnd, 441, '出完那一刻');
+    eq(w.deleteEnd, Math.round(20.114 * FPS), '删完 = 下一句开口那一帧（附录男声第 4 行）');
+    ok(w.typeEnd < w.deleteStart && w.holdEnd >= w.typeEnd, '三段必须接上（出现 → 停 → 删）');
+    // 逐字：出现与删除都**一个一个字**地变（不是一帧蹦出整句，也不是一次跳两个字）
+    const C = act1.INPUT_TEXT.length;
+    const typed = [];
+    for (let n = w.typeStart; n <= w.typeEnd; n++) typed.push(act1.charsTyped(n));
+    const gone = [];
+    for (let n = w.deleteStart; n <= w.deleteEnd; n++) gone.push(act1.charsDeleted(n));
+    eq(new Set(typed).size, C, `出现阶段该正好经过 ${C} 个长度（实测 ${new Set(typed).size} 个）`);
+    eq(new Set(gone).size, C, `删除阶段该正好经过 ${C} 个长度（实测 ${new Set(gone).size} 个）`);
+    for (let i = 1; i < typed.length; i++) ok(typed[i] - typed[i - 1] <= 1, `帧 ${w.typeStart + i} 一次跳了 ${typed[i] - typed[i - 1]} 个字`);
+    for (let i = 1; i < gone.length; i++) ok(gone[i] - gone[i - 1] <= 1, `帧 ${w.deleteStart + i} 一次删了 ${gone[i] - gone[i - 1]} 个字`);
+    eq(act1.charsTyped(w.typeEnd), C, '出完那一帧正好是整句');
+    eq(act1.charsDeleted(w.deleteEnd), C, '删完那一帧正好删掉整句');
+  });
+
+  test('固定区**只存在于引子**：帧 419 起整条消失（§2.1）', () => {
+    contains(body(418), 'stage__fixed', '418 帧还在');
+    eq(body(419).includes('stage__fixed'), false, '419 帧起不该有固定区');
+    eq(body(1000).includes('stage__fixed'), false, '第一幕里也没有');
+    eq(
+      intro.scrollWindowHeight(H, { prelude: false }) - intro.scrollWindowHeight(H, { prelude: true }),
+      intro.FIXED_HEIGHT,
+      '窗口高的差 = 固定区高',
+    );
+    contains(body(418), `--stage-scroll-h:${intro.scrollWindowHeight(H, { prelude: true })}px`, '418 的窗口高');
+    contains(body(419), `--stage-scroll-h:${intro.scrollWindowHeight(H, { prelude: false })}px`, '419 的窗口高');
+  });
+
+  test('思维链改写：原歌词以「不属于思考链的内容」出现，改写在思维链里（§2.2）', () => {
+    eq(act1.CONTEXT_EVENTS.length, 2, '两处「不属于思考链的内容」');
+    ok(act1.THINK_EVENTS.length >= 2, '至少两行改写');
+    for (const e of act1.CONTEXT_EVENTS) {
+      contains(body(e.n + (e.grow ?? 12)), 'ZkiH0q_text', '原歌词该走 ContextBody 那套布');
+    }
+    contains(body(605), 'hmm, maybe i have state for user', '改写①进思维链（590 + 12 帧吐完）');
+    contains(body(661), "hmm, maybe user don't feel the same", '改写②进思维链（646 + 12）');
+    contains(body(605), 'lcKema_thinkBody', '改写落在思维链正文里');
+    contains(body(605), '>思考<', '思维链表头是中文「思考」');
+  });
+
+  test('⭐ `hmm` / `maybe` 的预算：当前文档里 2 处，全片上限 3（第 4 处即失败）', () => {
+    const all = intro.allBlocks().flatMap((b) => b.lines);
+    const r = act1.countHedges(all);
+    eq(r.count, 2, `当前文档里的对冲句数（${r.hits.join(' / ')}）`);
+    ok(r.count <= 3, '全片预算 3 处（第三处在 T6 的帧 985）');
+  });
+
+  test('B 规则：那两句提前 0.5–1 s 进思维链', () => {
+    for (const [lyricFrame, thinkFrame] of [
+      [706, 694],
+      [746, 734],
+    ]) {
+      ok(act1.THINK_EVENTS.some((x) => x.n === thinkFrame), `帧 ${thinkFrame} 该有事件`);
+      const lead = lyricFrame - thinkFrame;
+      ok(lead >= 12 && lead <= 24, `提前量 ${lead} 帧该落在 0.5–1 s（12–24 帧）`);
+    }
+  });
+
+  test('第一幕接在同一份对话文档后面：引子的行还在，第一幕只往后加', () => {
+    const blocks = intro.allBlocks();
+    eq(
+      blocks.length,
+      intro.BLOCKS.length + act1.CONTEXT_EVENTS.length + 1,
+      '引子四块 + 两个 context + 一个思维链组',
+    );
+    eq(intro.revealedLines(419), intro.TOTAL_LINES, '419 帧引子的行都还在（内容不回退）');
+    ok(intro.revealedLines(802) > intro.TOTAL_LINES, '802 帧已经多出第一幕的行');
+    const boxes = blocks.reduce((s, b) => s + intro.revealAt(b, 700).boxes, 0);
+    const heads = blocks.filter((b) => b.thinkBody && intro.revealAt(b, 700).boxes > 0).length;
+    eq(
+      intro.contentHeight(700),
+      boxes * intro.LINE_H + heads * (intro.THINK_HEAD_LINES * intro.LINE_H + intro.THINK_BODY_PAD),
+      '内容高的构成：行盒 × 24 + 每个思维链块 32',
+    );
+    eq(heads, 2, '这时有两个思维链块（引子一块、第一幕一块）');
+  });
+
+  test('滚动位置在第一幕里仍然追底且够得着（含 419 —— 那一帧窗口高变了 144px）', () => {
+    for (let n = act1.ACT1.start; n <= 900; n++) {
+      const win = intro.scrollWindowHeight(H, { prelude: n < act1.ACT1.start });
+      const maxScroll = Math.max(0, intro.contentHeight(n) - win);
+      const want = intro.scrollAtFrame(n, { height: H });
+      ok(want <= maxScroll, `帧 ${n}: want=${want} > maxScroll=${maxScroll}`);
+      if (want > 0) eq(want, maxScroll, `帧 ${n} 追底`);
+    }
+  });
+});
+
+describe('Phase 5 · 焦点与文字光标（画面规格 §三「焦点」；作者 2026-10-01 拍板 A9）', () => {
+  const W = act1.INPUT_WINDOW;
+
+  test('输入框的光标只在**她在动作**的那一段出现（`[419, 484)`，484 起没有）', () => {
+    eq(act1.inputFocused(W.typeStart - 1), false, '418：她还没开始');
+    eq(act1.inputFocused(W.typeStart), true, '419：她开始打字');
+    eq(act1.inputFocused(W.deleteEnd), true, '483：她刚删完最后一个字（这一帧还在动作）');
+    eq(act1.inputFocused(W.deleteEnd + 1), false, '484：§三「箭头移出输入框（她不再说，开始看）」⇒ 输入框里没有光标了');
+    for (const n of [0, 200, 418, 484, 500, 1000, 4740]) {
+      eq(act1.inputCaretOn(n), false, `帧 ${n} 输入框里不该有光标`);
+    }
+  });
+
+  test('它真的在**闪**（不是一根常亮的竖条），而且亮/灭都由 `n` 决定', () => {
+    const s = caretStats(W.typeStart, W.deleteEnd + 1, { phaseFrom: W.typeStart, activeAt: act1.typedRecently });
+    ok(s.off > 0, `整段一帧都没灭（on=${s.on}）—— 那叫常亮，不叫闪`);
+    ok(s.on > s.off, `亮的帧（${s.on}）该多于灭的（${s.off}）—— 因为她一直在打字，而打字时是常亮的`);
+    ok(s.flips >= 2, `亮灭翻转只有 ${s.flips} 次 —— 闪得太少（0.5 s 一拍，65 帧里该翻转几次）`);
+    // 纯函数：同一帧两次调用相同
+    for (const n of [419, 445, 450, 470, 483]) {
+      eq(act1.inputCaretOn(n), act1.inputCaretOn(n), `帧 ${n}`);
+    }
+  });
+
+  test('⭐ 正在打字/退格的每一帧一定是亮的（真人打字时**光标不闪**，松手才闪）', () => {
+    let active = 0;
+    for (let n = W.typeStart; n <= W.deleteEnd; n++) {
+      if (!act1.typedRecently(n)) continue;
+      active++;
+      eq(act1.inputCaretOn(n), true, `帧 ${n} 刚刚敲过键，光标该是亮的`);
+    }
+    ok(active > 30, `"刚敲过键"的帧只有 ${active} 帧 —— 这条断言几乎没验到东西`);
+    // 整段打字与整段退格都该是**常亮**（4 帧一个字 < 半拍 12 帧）
+    for (let n = W.typeStart; n <= W.typeEnd; n++) eq(act1.inputCaretOn(n), true, `打字中帧 ${n} 该常亮`);
+    for (let n = W.deleteStart; n <= W.deleteEnd; n++) eq(act1.inputCaretOn(n), true, `退格中帧 ${n} 该常亮`);
+    // 刚获得焦点那一帧也是亮的（真光标点下去立刻出现，不是先灭半秒）
+    eq(act1.inputCaretOn(W.typeStart), true, '419 该是亮的');
+    // 只有**停手之后**才有灭的帧
+    const offs = [];
+    for (let n = W.typeStart; n <= W.deleteEnd; n++) if (!act1.inputCaretOn(n)) offs.push(n);
+    ok(offs.length > 0 && offs.every((n) => !act1.typedRecently(n)), `灭的帧里混进了动作帧：${offs.filter(act1.typedRecently).join(',')}`);
+    ok(offs.every((n) => n > W.typeEnd && n < W.deleteStart), `灭的帧该都落在"整句停在框里"那一段（实测 ${offs.join(',')}）`);
+  });
+
+  test('闪是**逐帧算的**，不靠 CSS 动画（CSS 动画跟真实时间走，是逐帧渲染的毒药）', () => {
+    const css = pageCss();
+    eq(/@keyframes[^{]*caret/i.test(css), false, 'CSS 里不该有 caret 的 @keyframes');
+    // 属性确实挂到了输入框上（伪元素靠它显示）；419 那一帧她刚敲下第一个字 ⇒ 字数 1
+    contains(body(419), `data-composer-input="true" data-input-len="1" data-caret="1"`, '帧 419 输入框该有光标');
+    contains(body(470), 'data-caret="1"', '帧 470（退格中）该有光标');
+    eq(/data-composer-input="true"[^>]*data-caret/.test(body(500)), false, '帧 500 输入框不该有光标');
+  });
+});
+
+describe('Phase 5 · 文案与标题（作者 2026-10-01 拍板 A1 / A8）', () => {
+  test('A1：`permission` 用真界面实显的「完全权限」（§1.1：dsh 的 UI 文案是中文）', () => {
+    eq(COMPOSER_TEXT.permission, '完全权限', '就是真界面那串');
+    contains(body(419), '完全权限', '要真的渲染进去');
+    eq(body(419).includes('Full access'), false, '不再用那个英文串');
+    // 模型名是**模型目录里的 real id 名**，本来就英文（§4.2 的 DEFAULT_MODELS）
+    eq(COMPOSER_TEXT.model, 'DeepSeek-V41-Flash High', '模型档位名不动');
+    eq(COMPOSER_TEXT.placeholder, '描述你想要构建的内容, / 调用指令, @ 文件或对话', 'placeholder 也不动');
+  });
+
+  test('A8：面板标题首字母大写 —— Terminal / Memory，以及换网络结构时用的 Network', () => {
+    eq(CELL_TITLE.term, 'Terminal', '右上');
+    eq(CELL_TITLE.memory, 'Memory', '右下');
+    eq(CELL_TITLE.network, 'Network', '右上换成网络结构时用的那个（T6 起）');
+    for (const [k, v] of Object.entries(CELL_TITLE)) {
+      eq(/^[A-Z]/.test(v), true, `${k} 该首字母大写（收到 ${v}）`);
+    }
+    // ⚠️ 标题是**画布侧**画的（`content/panels.js` 的字形图集），所以字符集必须带上这些字母，
+    //    否则 `drawText` 会记缺字形（那次 terminal 就是这么差点漏掉的）。
+    for (const v of Object.values(CELL_TITLE)) {
+      for (const ch of v) {
+        ok(PANELS_TITLE_CHARS.includes(ch), `标题字符集里缺 ${JSON.stringify(ch)}（${v}）`);
+      }
+    }
   });
 });
 
@@ -366,6 +612,35 @@ describe('Phase 5 · 舞台与焊点的宿主契约', () => {
       'snapshot',
     ]) {
       contains(STAGE_HTML, api, `__stage.${api} 该存在`);
+    }
+  });
+
+  test('⛔ 生成 CSS/HTML 的函数都不能抛错（反引号陷阱的**运行时**形态）', () => {
+    // 踩了四次的那个坑：CSS 写在 JS 模板字符串里，注释里出现反引号会**提前结束**模板字符串。
+    // ⚠️ 恶性变体：`` `foo`.bar`baz` `` 是**合法的 tagged template**，所以 `node --check` 通过、
+    //    import 也通过，只有**真的调用**时才炸：
+    //    `TypeError: "….wSkVaW_body is not a function`（2026-10-01 实测，见附录 C 记录 28）。
+    //    所以这条测试的价值不在于"测出什么逻辑"，而在于**强制每次都真的求值一次**。
+    const cases = [
+      ['pageCss', () => pageCss()],
+      ['composerCss', () => composerCss()],
+      ['composerHtml', () => composerHtml()],
+      ['composerHtml(有字+光标)', () => composerHtml({ input: '我这边下雨了', caret: true })],
+      ['probeCss', () => probeCss()],
+      ['probeBody(0)', () => probeBody(0)],
+      ['body(0)', () => body(0)],
+      ['body(419)', () => body(419)],
+    ];
+    for (const [name, fn] of cases) {
+      let v;
+      try {
+        v = fn();
+      } catch (e) {
+        ok(false, `${name}() 抛错了：${/** @type {Error} */ (e).message}（多半是模板字符串里的反引号）`);
+        continue;
+      }
+      eq(typeof v, 'string', `${name}() 该返回字符串`);
+      ok(v.length > 50, `${name}() 不该是空串`);
     }
   });
 

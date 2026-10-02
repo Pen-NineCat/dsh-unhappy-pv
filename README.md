@@ -6,10 +6,10 @@
 > **状态：出片管线已完成并验收；片子还没开始画。**
 >
 > - **管线**：纯 Node —— `@napi-rs/canvas`（Skia）+ Playwright + ffmpeg + `worker_threads`，Phase 0–7 全部落地。
->   本轮实测：`node film/check.js` 退出 0、`node film/test/run.js` **209/209**、`node film/guard.js` **14/14**（三条 ⭐ 护栏全过）。
-> - **画面**：**引子的网页层已经实现** —— `film/pages/intro.js` + `body.js` 的 `intro` 变体，帧 0–419 已渲到 `out/prelude/`。
->   但**图形侧登记的还是管线自检画面**（`film/engine/content.js` 把四段都指向 `content/example.js`）：引子的画布部分与第一幕之后**都还没写**。
->   分镜与画面规格是本地文档（`PersonalWorkaround/`，不提交）。
+>   本轮实测：`node film/check.js` 退出 0、`node film/test/run.js` **249/249**、`node film/guard.js` **14/14**（三条 ⭐ 护栏全过）。
+> - **画面**：按仓库根的 **[`design-options.md`](design-options.md)（画面规格）** 逐段实现中 —— 引子 `[0,419)` 与第一幕 `[419,1903)` 已有画布侧实现
+>   （`film/content/prelude.js`、`film/content/act1.js`，含 T4 的三格版面），网页层的引子页在 `film/pages/intro.js`。
+>   **幕间与第二幕仍指向管线自检画面**（`content/example.js`）。分镜、任务清单（T0–T10）、验收标准与 ⛔ 待拍板项都在那份规格里。
 > - **没做过的**：`--full`（4741 帧整片）没跑过（护栏快档只渲 48 帧验证链路）；**跨机器确定性没有验证**（只证明了同机、跨进程、跨 worker 数一致）；没有任何 PV 画面的视觉验收。
 > - 灵感与技术路线来自参考项目 [`world-execute-me-dsh-pv`](https://github.com/Misakazentai/world-execute-me-dsh-pv)（本地副本在 `PersonalWorkaround/`，不提交）。
 
@@ -64,9 +64,10 @@ node tools/trim-song-parity.mjs   # 与过渡期的 Python 版逐字节对拍（
 
 | 路径 | 内容 |
 |---|---|
+| [`design-options.md`](design-options.md) | **画面规格**（仓库根，随代码提交）：现行结论、任务清单 T0–T10、验收标准、⛔ 待拍板项——它就是给管线 Agent 的施工输入 |
 | `film/kit/` | 图形原语：画布与图层、位图算子（LUT / box 降采样 / 可分离高斯 / Sobel）、字形图集与文本、调色、噪声、后期 |
 | `film/engine/` | `clock.js`（常量唯一来源）、`timeline.js`（段表 + 断言）、`layers.js`（六层顺序）、`content.js`（**内容的唯一注册点**）、`frame.js`（`frame(n, prev)`）、`camera.js`、`transitions.js` |
-| `film/content/` | 图形侧场景。**现在只有 `example.js`（管线自检）；引子的画布部分还没写** |
+| `film/content/` | 图形侧场景：`prelude.js`（引子：占位背景 + 三格骨架）、`act1.js`（第一幕）、`panels.js`、`cursor.js`、`memory.js`；`example.js` 是管线自检画面（**幕间与第二幕仍用它**） |
 | `film/pages/` | 网页层：**`intro.js`（引子的真页面，帧 0–419）**、`body.js`（`body(t) -> HTML`，`intro` / `probe` 两个变体）、`gen-frames.js`（→ frames.json + 舞台）、`shot.mjs`（Playwright 截图器）、`preview.mjs`（全览表 + 预览片）、`extract-css.mjs`（抽 dsh CSS → `vendor/dsh-css/`）、`dsh-*.js` |
 | `film/compose/` | 把网页截图当图层接进图形侧：`overlay.js`、`lead.js`（主导权）、`shots.js`（缺帧报错）、`track-layer.js` |
 | `film/lib/` | `ffmpeg-path.js`（三级路径解析）、`frame-segments.js`、`render-worker.js`、`static-server.js` |
@@ -75,6 +76,7 @@ node tools/trim-song-parity.mjs   # 与过渡期的 Python 版逐字节对拍（
 | `film/vendor/` | dsh 的 MIT 素材：三个包副本 + 抽取出来的 `dsh-css/`（见该目录的 README） |
 | `tools/trim-song.mjs`、`trim-song-parity.mjs` | 母版修剪（Node）与两版对拍 |
 | `Resource/`、`input/` | 指纹 / 本机输入（音频、歌词；除 `README.md` 外全部忽略） |
+| `data/` | 由脚本生成的小清单：`cursor/keypoints.json`（鼠标路径的关键点表） |
 | `out/` | 产物：帧、预览、成片、护栏报告 |
 
 目录名定下后**不要改名**：代码之间靠相对位置互相找到（参考项目的教训）。

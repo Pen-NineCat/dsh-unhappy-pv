@@ -328,17 +328,15 @@ export function drawText(dst, atlas, pos, str, opts = {}) {
       continue;
     }
     if (!g.blank) {
-      ctx.drawImage(
-        tint,
-        g.col * atlas.cellW,
-        g.row * atlas.cellH,
-        atlas.cellW,
-        atlas.cellH,
-        pen + g.xOff,
-        y0 + g.yOff + atlas.ascent,
-        g.w,
-        g.h,
-      );
+      // ⚠️ **源矩形必须是墨迹框，不是整个字格**（2026-10-01 实测修掉的一个真 bug）：
+      //    原来写的是 `drawImage(tint, col*cellW, row*cellH, cellW, cellH, …, g.w, g.h)` ——
+      //    取整格（10×18）当源、塞进墨迹框（约 5×7）当目标 ⇒ 每个字都被**缩放着压扁**成碎片。
+      //    症状很会骗人：看起来像"字体没抗锯齿 / 被二值化了"，其实是几何错了。
+      //    实测：同一句 `terminal`，图集路径只有 97 个非零像素，fillText 路径有 246 个。
+      //    正确的源矩形 = 墨迹在图集里的位置，尺寸与目标一致（1:1 blit，不重采样）。
+      const sx = g.col * atlas.cellW + g.xOff;
+      const sy = g.row * atlas.cellH + atlas.ascent + g.yOff;
+      ctx.drawImage(tint, sx, sy, g.w, g.h, pen + g.xOff, y0 + g.yOff + atlas.ascent, g.w, g.h);
       drawn++;
     }
     pen += mono ? atlas.cellW : g.measured;
@@ -393,7 +391,13 @@ const tintCache = new Map();
  */
 export function drawTextDirect(dst, font, x, y, str, opts = {}) {
   const ctx = ctx2d(dst);
-  ctx.font = `${font.size}px ${font.fontKey}`;
+  // ⚠️ 兼容两种字体对象：`registerFont()` 给的是 `{key}`，`glyphAtlas()` 给的是 `{fontKey}`。
+  //    原来只认 `font.fontKey` —— 传 `registerFont()` 的结果进来会拼出 `'18px undefined'`，
+  //    而 `undefined` 在字体串里是个**合法家族名**，于是**静默回退到默认字体**（字号还是对的，
+  //    所以肉眼只觉得"字有点怪"，不会报错）。2026-10-01 由"图集 vs fillText"那条对比测试抓出来。
+  const key = /** @type {any} */ (font).fontKey ?? /** @type {any} */ (font).key;
+  if (!key) throw new Error('drawTextDirect: 字体对象里没有 key / fontKey');
+  ctx.font = `${font.size}px ${key}`;
   ctx.textBaseline = 'alphabetic';
   ctx.globalAlpha = opts.alpha ?? 1;
   ctx.fillStyle = opts.color ?? '#ffffff';

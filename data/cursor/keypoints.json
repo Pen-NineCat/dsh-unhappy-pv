@@ -1,0 +1,29 @@
+{
+  "note": "鼠标路径的关键点清单（画面规格 §三 的『路径契约』）。这一份是**唯一**的路径来源：film/engine/cursor.js 读它、按 n 确定性回放。作者可以直接改这个文件（改完跑 node film/test/run.js 与 film/guard.js）。",
+  "contract": {
+    "来源": "纯程序化（M2）：只保证**落点与时刻正确**，路径由 engine/cursor.js 从 A 到 B 生成；不手工标路径点，不录制。",
+    "缓动": "ease-in-out + 一次轻微过冲（engine/cursor.js 的 OVERSHOOT，沿直线方向过冲后回落）。",
+    "抖动": "低频平滑，不是逐帧独立随机：每 8 帧换一个偏移目标、之间 smoothstep 插值，幅度 1–3 px；用 frameRng(seed, n) 播种，逐帧可复现。",
+    "形状": "不在这里写：由 (x,y) 落在哪个控件推断（输入框矩形内 = I-beam；可点控件上 = 手型；其余 = 箭头），判据是 film/engine/layout.js 的 CONTROLS。",
+    "落点": "`at` 只能是 film/engine/layout.js 的 ANCHORS 里的名字（拼错会当场抛错并列出可用名字）。",
+    "时间": "`t` 是秒；帧号由 n = Math.round(t * FPS) 得到（AGENTS.md §2 规则 5），所以这里不写帧号。"
+  },
+  "version": 1,
+  "keypoints": [
+    {
+      "t": 17.454,
+      "at": "composer.input",
+      "note": "§2.2 开词帧：她在输入框里打字（I-beam）。此前（引子 0–419）没有鼠标 —— 见 §2.1，引子的画面清单里没有它。"
+    },
+    {
+      "t": 20.114,
+      "at": "composer.input",
+      "note": "§2.2：删完最后一个字（= 下一句开口那一帧）。打字期间鼠标不动，只有低频抖动。"
+    },
+    {
+      "t": 20.75,
+      "at": "left.watch",
+      "note": "§三：『她把字删掉、箭头移出输入框（她不再说，开始看）』。文档只规定『移出』，落点由管线取 `left.watch`（输入口外面），见 layout.js 的 ANCHORS。"
+    }
+  ]
+}
